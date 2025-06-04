@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "moduleResolution": "node",
+    "allowJs": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "target": "esnext",
+    "skipLibCheck": true
+  },
+  "extends": "expo/tsconfig.base"
+}
