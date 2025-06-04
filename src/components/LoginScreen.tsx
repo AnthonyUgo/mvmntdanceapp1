@@ -16,7 +16,7 @@ const LoginScreen = () => {
 
   // Google Sign-In
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com', // Replace with your Google Web Client ID
+    clientId: '725624410329-qoqabsqmhabi1d62hetqba327lbdpsuk.apps.googleusercontent.com', // Replace with your Google Web Client ID
   });
 
   useEffect(() => {
