@@ -1,5 +1,11 @@
 {
   "plugins": [
     "expo-web-browser"
-  ]
+  ],
+  "android": {
+    "package": "com.anthonyu.mvmntdanceapp"
+  },
+  "ios": {
+    "bundleIdentifier": "com.anthonyu.mvmntdanceapp"
+  }
 }
