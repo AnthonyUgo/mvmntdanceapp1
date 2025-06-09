@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState } from 'react';
 import {
   View,
   Text,
@@ -11,20 +11,14 @@ import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-import * as AuthSession from 'expo-auth-session';
+// import * as AuthSession from 'expo-auth-session';  // Azure removed
+
 import { getFirebaseAuth } from '../firebase/config';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 
+// WebBrowser session
 WebBrowser.maybeCompleteAuthSession();
-
-const tenantId = '7b7623fe-374a-4c13-83e0-a2567f16508b';
-const clientId = '35c321e2-9c8c-4401-9c77-7dba786d3925';
-const azureDiscovery = {
-  authorizationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`,
-  tokenEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
-  revocationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout`,
-};
 
 const OrganizerLoginScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -37,61 +31,38 @@ const OrganizerLoginScreen: React.FC = () => {
     clientId: '1074387332824-2j90gu9gldca4t19ddtg6k4ea27ecgev.apps.googleusercontent.com',
   });
 
-  // Azure AD login
-  const redirectUri = AuthSession.makeRedirectUri({
-    native: 'mvmntdanceapp://redirect',
-    // useProxy is no longer supported in makeRedirectUri; this is safe to omit now
-  });
-
-  const [azureRequest, azureResponse, promptAzureLogin] = AuthSession.useAuthRequest(
-    {
-      clientId,
-      redirectUri,
-      scopes: ['openid', 'profile', 'email'],
-      responseType: 'code',
-    },
-    azureDiscovery
-  );
-
-  useEffect(() => {
-    if (azureResponse?.type === 'success') {
-      const { code } = azureResponse.params;
-      Alert.alert('Azure AD Login', `Auth code: ${code}`);
-      // TODO: Exchange code for access token
-      navigation.navigate('OrganizerDashboard' as never);
-    }
-  }, [azureResponse, navigation]);
-
   const backgroundColor = theme === 'dark' ? '#121212' : '#fff';
   const textColor = theme === 'dark' ? '#fff' : '#000';
   const inputBackground = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
   const accentColor = '#4285F4';
 
+  // Email login
   const handleEmailSignIn = async () => {
     if (!email || !password) {
       Alert.alert('Missing Fields', 'Please enter both email and password.');
       return;
     }
+
     try {
       const auth = getFirebaseAuth();
       await signInWithEmailAndPassword(auth, email, password);
       Alert.alert('Login successful!');
       navigation.navigate('OrganizerDashboard' as never);
     } catch (error: any) {
+      console.error('Login error:', error);
       Alert.alert('Login failed', error.message);
     }
   };
 
+  // Google login
   const handleGoogleLogin = () => {
     promptGoogleLogin();
   };
 
-  const handleAzureLogin = () => {
-    promptAzureLogin();
-  };
-
+  // Sign Up
   const handleSignUpPress = () => {
     Alert.alert('Sign Up', 'Sign-up functionality will be implemented soon!');
+    // Here you might navigate to your SignUpScreen (local signup)
     // navigation.navigate('SignUp');
   };
 
@@ -141,16 +112,7 @@ const OrganizerLoginScreen: React.FC = () => {
         </Text>
       </TouchableOpacity>
 
-      {/* Azure AD Login Button */}
-      <TouchableOpacity
-        style={[styles.azureButton, { backgroundColor: inputBackground }]}
-        onPress={handleAzureLogin}
-      >
-        <Ionicons name="logo-microsoft" size={24} color={accentColor} />
-        <Text style={[styles.googleButtonText, { color: textColor }]}>
-          Continue with Azure AD
-        </Text>
-      </TouchableOpacity>
+      {/* Removed Azure AD Login Button */}
 
       {/* First Time? Sign Up */}
       <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
@@ -208,14 +170,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     marginTop: 20,
-  },
-  azureButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 10,
   },
   googleButtonText: {
     fontSize: 16,

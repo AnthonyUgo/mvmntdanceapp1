@@ -38,10 +38,9 @@ const AuthScreen: React.FC = () => {
   });
 
   // Azure AD login
-const redirectUri = AuthSession.makeRedirectUri({
-  native: 'mvmntdanceapp://redirect',
-  useProxy: true
-});
+  const redirectUri = AuthSession.makeRedirectUri({
+    native: 'mvmntdanceapp://redirect'
+  });
 
   const [azureRequest, azureResponse, promptAzureLogin] = AuthSession.useAuthRequest(
     {
@@ -57,7 +56,6 @@ const redirectUri = AuthSession.makeRedirectUri({
     if (azureResponse?.type === 'success') {
       const { code } = azureResponse.params;
       Alert.alert('Azure AD Login', `Auth code: ${code}`);
-      // TODO: Exchange code for access token
       navigation.navigate('OrganizerDashboard' as never);
     }
   }, [azureResponse, navigation]);
@@ -91,8 +89,7 @@ const redirectUri = AuthSession.makeRedirectUri({
   };
 
   const handleSignUpPress = () => {
-    Alert.alert('Sign Up', 'Sign-up functionality will be implemented soon!');
-    // navigation.navigate('SignUp');
+    navigation.navigate('SignUp' as never);
   };
 
   return (
@@ -102,7 +99,6 @@ const redirectUri = AuthSession.makeRedirectUri({
         Welcome! Please sign in to continue.
       </Text>
 
-      {/* Login Form */}
       <TextInput
         style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
         placeholder="Email"
@@ -121,7 +117,6 @@ const redirectUri = AuthSession.makeRedirectUri({
         secureTextEntry
       />
 
-      {/* Sign In Button */}
       <TouchableOpacity
         style={[styles.signInButton, { backgroundColor: accentColor }]}
         onPress={handleEmailSignIn}
@@ -130,7 +125,6 @@ const redirectUri = AuthSession.makeRedirectUri({
         <Text style={[styles.signInButtonText, { color: '#fff' }]}>Sign In</Text>
       </TouchableOpacity>
 
-      {/* Google Login Button */}
       <TouchableOpacity
         style={[styles.googleButton, { backgroundColor: inputBackground }]}
         onPress={handleGoogleLogin}
@@ -141,7 +135,6 @@ const redirectUri = AuthSession.makeRedirectUri({
         </Text>
       </TouchableOpacity>
 
-      {/* Azure AD Login Button */}
       <TouchableOpacity
         style={[styles.azureButton, { backgroundColor: inputBackground }]}
         onPress={handleAzureLogin}
@@ -152,7 +145,6 @@ const redirectUri = AuthSession.makeRedirectUri({
         </Text>
       </TouchableOpacity>
 
-      {/* First Time? Sign Up */}
       <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
         <Text style={[styles.signUpText, { color: textColor }]}>
           First time?{' '}
@@ -167,59 +159,35 @@ const redirectUri = AuthSession.makeRedirectUri({
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 24, fontWeight: 'bold', marginBottom: 16,
   },
   subtitle: {
-    fontSize: 16,
-    marginBottom: 20,
+    fontSize: 16, marginBottom: 20,
   },
   input: {
-    width: '80%',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    marginBottom: 12,
+    width: '80%', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12,
+    fontSize: 16, marginBottom: 12,
   },
   signInButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 10,
+    flexDirection: 'row', alignItems: 'center', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 16, marginTop: 10,
   },
   signInButtonText: {
-    fontSize: 16,
-    marginLeft: 8,
+    fontSize: 16, marginLeft: 8,
   },
   googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 20,
+    flexDirection: 'row', alignItems: 'center', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 16, marginTop: 20,
   },
   azureButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 10,
+    flexDirection: 'row', alignItems: 'center', borderRadius: 8,
+    paddingVertical: 10, paddingHorizontal: 16, marginTop: 10,
   },
   googleButtonText: {
-    fontSize: 16,
-    marginLeft: 8,
+    fontSize: 16, marginLeft: 8,
   },
   signUpContainer: {
     marginTop: 20,
