@@ -1,18 +1,26 @@
-import { initializeApp } from 'firebase/app';
+// src/firebase/config.ts
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBd3E5a4EFTtBdr5Ha3Lg8cA28DOepTP4s",
-  authDomain: "mvmntdanceapp.firebaseapp.com",
-  projectId: "mvmntdanceapp",
-  storageBucket: "mvmntdanceapp.appspot.com",
-  messagingSenderId: "725624410329",
-  appId: "1:725624410329:web:2e7d1a2bb41ffa1d29eec8"
+  apiKey: "AIzaSyC5VC63wsmpp_vCg8ul29wopgUuvy1Innc",
+  authDomain: "mvmntdanceapp-eeac3.firebaseapp.com",
+  projectId: "mvmntdanceapp-eeac3",
+  storageBucket: "mvmntdanceapp-eeac3.appspot.com",
+  messagingSenderId: "1074387332824",
+  appId: "1:1074387332824:web:07287f62909816b227b1ad",
+  measurementId: "G-C78QHTKF20"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const storage = getStorage(app);
+// Initialize app ONCE and export get functions
+let app;
+if (getApps().length === 0) {
+  app = initializeApp(firebaseConfig);
+} else {
+  app = getApp();
+}
 
-export { app, auth, storage };
+// Lazy-load functions
+export const getFirebaseAuth = () => getAuth(app);
+export const getFirebaseStorage = () => getStorage(app);

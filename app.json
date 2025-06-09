@@ -1,11 +1,26 @@
 {
-  "plugins": [
-    "expo-web-browser"
-  ],
-  "android": {
-    "package": "com.anthonyu.mvmntdanceapp"
-  },
-  "ios": {
-    "bundleIdentifier": "com.anthonyu.mvmntdanceapp"
+  "expo": {
+    "name": "mvmntdanceapp",
+    "slug": "mvmntdanceapp",
+    "owner": "anthonyu",
+    "plugins": [
+      "expo-web-browser",
+      "expo-font"
+    ],
+    "android": {
+      "package": "com.anthonyu.mvmntdanceapp"
+    },
+    "ios": {
+      "bundleIdentifier": "com.anthonyu.mvmntdanceapp"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "bab36109-82b7-4b92-8ef6-b4ffcaf36d02"
+      }
+    },
+    "runtimeVersion": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/bab36109-82b7-4b92-8ef6-b4ffcaf36d02"
+    }
   }
 }
