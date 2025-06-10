@@ -12,9 +12,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
-import { getFirebaseAuth } from '../firebase/config';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../App';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -26,11 +26,16 @@ const azureDiscovery = {
   revocationEndpoint: `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/logout`,
 };
 
+type AuthScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'Auth'
+>;
+
 const AuthScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation();
+  const navigation = useNavigation<AuthScreenNavigationProp>();
 
   // Google login
   const [googleRequest, googleResponse, promptGoogleLogin] = Google.useIdTokenAuthRequest({
@@ -70,13 +75,34 @@ const AuthScreen: React.FC = () => {
       Alert.alert('Missing Fields', 'Please enter both email and password.');
       return;
     }
+
     try {
-      const auth = getFirebaseAuth();
-      await signInWithEmailAndPassword(auth, email, password);
-      Alert.alert('Login successful!');
-      navigation.navigate('OrganizerDashboard' as never);
-    } catch (error: any) {
-      Alert.alert('Login failed', error.message);
+      const response = await fetch('https://b143-2605-ad80-90-c057-960-e89c-1695-c7c.ngrok-free.app/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        console.error('Failed to parse JSON:', err);
+        console.error('Response Text:', text);
+        Alert.alert('Server error.', 'Unexpected server response.');
+        return;
+      }
+
+      if (response.ok) {
+        Alert.alert('Login successful!');
+        navigation.navigate('OrganizerDashboard' as never);
+      } else {
+        Alert.alert('Login failed', data.error || 'Unknown error.');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Server error.', 'Please try again later.');
     }
   };
 

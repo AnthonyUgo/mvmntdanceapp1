@@ -3,10 +3,14 @@ import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './src/components/HomeScreen';
 import AuthScreen from './src/components/AuthScreen';
-import OrganizerLoginScreen from './src/components/OrganizerLoginScreen'; // ✅ NEW SCREEN
+import OrganizerLoginScreen from './src/components/OrganizerLoginScreen';
+import OrganizerAccountScreen from './src/components/OrganizerAccountScreen'; // ✅ NEW SCREEN
 import OrganizerDashboardScreen from './src/components/OrganizerDashboardScreen'; // Assuming you already have this
 import ProfileScreen from './src/components/ProfileScreen';
 import SettingsScreen from './src/components/SettingScreen';
+import CreateEventScreen from './src/components/CreateEventScreen';
+import MyEventScreen from './src/components/MyEventScreen'
+import OrganizerSignUpScreen from './src/components/OrganizerSignUpScreen';
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
 
 // 1️⃣ Define your stack param list
@@ -14,9 +18,13 @@ export type RootStackParamList = {
   Home: undefined;
   Auth: undefined;
   OrganizerLogin: undefined;
+  OrganizerAccount: undefined;
+  OrganizerSignUp: undefined;
   OrganizerDashboard: undefined;
+  CreateEvent: undefined;
   Profile: undefined;
   Settings: undefined;
+  MyEvents: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,7 +65,28 @@ export default function App() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ headerShown: true, title: 'Settings' }}
+              /> 
+              <Stack.Screen
+                name="OrganizerSignUp"
+                component={OrganizerSignUpScreen}
+                options={{ headerShown: true, title: 'Organizer Sign Up' }}
               />
+              <Stack.Screen
+                name="CreateEvent"
+                component={CreateEventScreen}
+                options={{ headerShown: true, title: 'Create Event' }}
+             />
+             <Stack.Screen
+                name="MyEvents"
+                component={MyEventScreen}
+                options={{ headerShown: true, title: 'My Events' }}
+              />
+              <Stack.Screen
+                name="OrganizerAccount"
+                component={OrganizerAccountScreen}
+                options={{ headerShown: true, title: 'Account' }}
+              />
+              
             </Stack.Navigator>
           </NavigationContainer>
         )}

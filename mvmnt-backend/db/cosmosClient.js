@@ -4,7 +4,7 @@ const { CosmosClient } = require('@azure/cosmos');
 
 const endpoint = process.env.COSMOS_ENDPOINT; // stored in .env
 const key = process.env.COSMOS_KEY;           // stored in .env
-const databaseId = 'mvmntdanceapp';           // use your database name
+const databaseId = process.env.COSMOS_DB_DATABASE;           // use your database name
 
 const client = new CosmosClient({ endpoint, key });
 

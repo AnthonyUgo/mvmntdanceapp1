@@ -3,6 +3,7 @@
     "name": "mvmntdanceapp",
     "slug": "mvmntdanceapp",
     "owner": "anthonyu",
+    "scheme": "mvmntdanceapp",
     "plugins": [
       "expo-web-browser",
       "expo-font"

@@ -11,22 +11,25 @@ import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
-// import * as AuthSession from 'expo-auth-session';  // Azure removed
-
-import { getFirebaseAuth } from '../firebase/config';
-import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../App';
 
 // WebBrowser session
 WebBrowser.maybeCompleteAuthSession();
+
+type OrganizerLoginScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  'OrganizerLogin'
+>;
 
 const OrganizerLoginScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation();
+  const navigation = useNavigation<OrganizerLoginScreenNavigationProp>();
 
-  // Google login
+  // Google login (still here if needed)
   const [googleRequest, googleResponse, promptGoogleLogin] = Google.useIdTokenAuthRequest({
     clientId: '1074387332824-2j90gu9gldca4t19ddtg6k4ea27ecgev.apps.googleusercontent.com',
   });
@@ -44,13 +47,32 @@ const OrganizerLoginScreen: React.FC = () => {
     }
 
     try {
-      const auth = getFirebaseAuth();
-      await signInWithEmailAndPassword(auth, email, password);
-      Alert.alert('Login successful!');
-      navigation.navigate('OrganizerDashboard' as never);
-    } catch (error: any) {
+      const response = await fetch('https://c0a6-2605-ad80-90-c057-ed21-224a-23d1-b91.ngrok-free.app/api/auth/organizer/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const text = await response.text();
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        console.error('Failed to parse JSON:', err);
+        console.error('Response Text:', text);
+        Alert.alert('Server error.', 'Unexpected server response.');
+        return;
+      }
+
+      if (response.ok) {
+        Alert.alert('Login successful!');
+        navigation.navigate('OrganizerDashboard' as never);
+      } else {
+        Alert.alert('Login failed', data.error || 'Unknown error.');
+      }
+    } catch (error) {
       console.error('Login error:', error);
-      Alert.alert('Login failed', error.message);
+      Alert.alert('Server error.', 'Please try again later.');
     }
   };
 
@@ -61,9 +83,7 @@ const OrganizerLoginScreen: React.FC = () => {
 
   // Sign Up
   const handleSignUpPress = () => {
-    Alert.alert('Sign Up', 'Sign-up functionality will be implemented soon!');
-    // Here you might navigate to your SignUpScreen (local signup)
-    // navigation.navigate('SignUp');
+    navigation.navigate('OrganizerSignUp' as never);
   };
 
   return (
@@ -111,8 +131,6 @@ const OrganizerLoginScreen: React.FC = () => {
           Continue with Google
         </Text>
       </TouchableOpacity>
-
-      {/* Removed Azure AD Login Button */}
 
       {/* First Time? Sign Up */}
       <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
