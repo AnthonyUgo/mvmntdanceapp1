@@ -25,7 +25,6 @@ router.post('/signup', async (req, res) => {
   }
 
   try {
-    // Check if user exists
     const { resources } = await container.items
       .query({
         query: 'SELECT * FROM c WHERE c.email = @email',
@@ -37,10 +36,8 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Save user
     const newUser = {
       id: email,
       email,
@@ -64,7 +61,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ error: 'Please provide email and password' });
+    return res.status(400).json({ error: 'Please provide email and password.' });
   }
 
   try {
@@ -76,14 +73,14 @@ router.post('/login', async (req, res) => {
       .fetchAll();
 
     if (resources.length === 0) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
     const user = resources[0];
     const isMatch = await bcrypt.compare(password, user.password);
 
     if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password' });
+      return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
     res.status(200).json({ message: 'Login successful!', role: user.role });
@@ -96,7 +93,6 @@ router.post('/login', async (req, res) => {
 // =============================
 // ORGANIZER SIGNUP
 // =============================
-
 router.post('/organizer/signup', async (req, res) => {
   console.log('Incoming signup request:', req.body);
   const {
@@ -109,13 +105,11 @@ router.post('/organizer/signup', async (req, res) => {
     gender
   } = req.body;
 
-  // Validate required fields
   if (!firstName || !lastName || !username || !email || !password || !dob || !gender) {
     return res.status(400).json({ error: 'Please provide all required fields.' });
   }
 
   try {
-    // Check if email or username exists
     const { resources } = await container.items
       .query({
         query: 'SELECT * FROM c WHERE c.email = @email OR c.username = @username',
@@ -130,20 +124,19 @@ router.post('/organizer/signup', async (req, res) => {
       return res.status(400).json({ error: 'Email or username already exists.' });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Save organizer user
     const newOrganizer = {
       id: email,
       firstName,
       lastName,
-      username: username,
+      username,
       email,
       password: hashedPassword,
       dob,
       gender,
-      role: 'organizer'
+      role: 'organizer',  // ✅ Added missing comma
+      createdAt: new Date().toISOString()  // ✅ Added account creation date
     };
 
     await container.items.create(newOrganizer, { partitionKey: username });
@@ -155,6 +148,9 @@ router.post('/organizer/signup', async (req, res) => {
   }
 });
 
+// =============================
+// ORGANIZER LOGIN
+// =============================
 router.post('/organizer/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -184,12 +180,21 @@ router.post('/organizer/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email or password.' });
     }
 
-    res.status(200).json({ message: 'Login successful!', role: organizer.role });
+    res.status(200).json({
+      message: 'Login successful!',
+      role: organizer.role,
+      firstName: organizer.firstName,
+      lastName: organizer.lastName,
+      username: organizer.username,
+      email: organizer.email,  // ✅ Added missing comma
+      dob: organizer.dob,
+      gender: organizer.gender,
+      createdAt: organizer.createdAt
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
 });
-
 
 module.exports = router;

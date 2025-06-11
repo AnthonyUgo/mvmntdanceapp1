@@ -11,10 +11,10 @@ import {
   ScrollView,
   Pressable,
   Alert,
+  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
-import { Switch } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -68,22 +68,35 @@ const OrganizerSignUpScreen = () => {
     }
 
     try {
-      const response = await fetch('http://100.110.138.201:5050/api/auth/organizer/login', {
-        // 🔥 Replace YOUR_LOCAL_IP with your machine’s IP (e.g., 192.168.x.x)
+      const requestBody = {
+        firstName,
+        lastName,
+        username,
+        email,
+        password,
+        dob,
+        gender,
+      };
+
+      console.log('🚀 Submitting sign-up:', requestBody);
+
+      const response = await fetch('http://100.110.138.201:5050/api/auth/organizer/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          username,
-          email,
-          password,
-          dob,
-          gender,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      console.log('🔍 Response Text:', text);
+
+      let data;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch (err) {
+        console.error('❌ JSON parse error:', err);
+        Alert.alert('Server error', 'Unexpected server response.');
+        return;
+      }
 
       if (response.ok) {
         Alert.alert('Sign Up Successful!', 'You can now log in.');
@@ -92,11 +105,11 @@ const OrganizerSignUpScreen = () => {
         Alert.alert('Sign Up Failed', data.error || 'An unexpected error occurred.');
       }
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('❌ Signup error:', error);
       if (error instanceof Error) {
-        Alert.alert('Server error.', error.message);
+        Alert.alert('Server error', error.message);
       } else {
-        Alert.alert('Server error.', 'An unexpected error occurred.');
+        Alert.alert('Server error', 'An unexpected error occurred.');
       }
     }
   };
@@ -143,6 +156,7 @@ const OrganizerSignUpScreen = () => {
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            keyboardType="email-address"
           />
 
           {/* Password Field with Toggle */}
@@ -225,8 +239,14 @@ const OrganizerSignUpScreen = () => {
 
           {/* Sign Up Button */}
           <TouchableOpacity
-            style={[styles.button, { backgroundColor: accentColor }]}
+            style={[
+              styles.button,
+              {
+                backgroundColor: acceptedTos ? accentColor : '#aaa',
+              },
+            ]}
             onPress={handleEmailSignUp}
+            disabled={!acceptedTos}
           >
             <Text style={styles.buttonText}>Sign Up</Text>
           </TouchableOpacity>

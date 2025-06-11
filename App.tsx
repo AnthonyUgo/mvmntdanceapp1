@@ -10,6 +10,7 @@ import ProfileScreen from './src/components/ProfileScreen';
 import SettingsScreen from './src/components/SettingScreen';
 import CreateEventScreen from './src/components/CreateEventScreen';
 import MyEventScreen from './src/components/MyEventScreen'
+import ManageEventScreen from './src/components/ManageEventScreen';
 import OrganizerSignUpScreen from './src/components/OrganizerSignUpScreen';
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
 
@@ -25,6 +26,7 @@ export type RootStackParamList = {
   Profile: undefined;
   Settings: undefined;
   MyEvents: undefined;
+  ManageEvent: { eventId: string; isCollaborator?: boolean };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -85,6 +87,11 @@ export default function App() {
                 name="OrganizerAccount"
                 component={OrganizerAccountScreen}
                 options={{ headerShown: true, title: 'Account' }}
+              />
+              <Stack.Screen
+                name="ManageEvent"
+                component={ManageEventScreen}
+                options={{ headerShown: true, title: 'Manage Event' }}
               />
               
             </Stack.Navigator>

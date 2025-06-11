@@ -14,20 +14,66 @@ import { ThemeContext } from '../contexts/ThemedContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
 
 const OrganizerAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
+  const navigation = useNavigation();
 
-  const [name, setName] = useState('Muvs Events');
-  const [isEditing, setIsEditing] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [location, setLocation] = useState<string>('Fetching location...');
+  const [isEditing, setIsEditing] = useState(false);
 
   const backgroundColor = theme === 'dark' ? '#121212' : '#f9f9f9';
   const textColor = theme === 'dark' ? '#fff' : '#000';
   const accentColor = '#4285F4';
 
-  // Pick image from gallery
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const storedFirstName = await AsyncStorage.getItem('userFirstName');
+        const storedLastName = await AsyncStorage.getItem('userLastName');
+        const storedUsername = await AsyncStorage.getItem('userUsername');
+
+        if (storedFirstName) setFirstName(storedFirstName);
+        if (storedLastName) setLastName(storedLastName);
+        if (storedUsername) setUsername(storedUsername);
+
+        const savedLocation = await AsyncStorage.getItem('userLocation');
+        if (savedLocation) {
+          setLocation(savedLocation);
+        } else {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            setLocation('Permission denied');
+            return;
+          }
+          let loc = await Location.getCurrentPositionAsync({});
+          let reverseGeocode = await Location.reverseGeocodeAsync({
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          });
+          if (reverseGeocode.length > 0) {
+            const { city, region } = reverseGeocode[0];
+            const locString = `${city || ''}, ${region || ''}`;
+            setLocation(locString);
+            await AsyncStorage.setItem('userLocation', locString);
+          } else {
+            setLocation('Location unavailable');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+        setLocation('Error fetching location');
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -45,42 +91,16 @@ const OrganizerAccountScreen: React.FC = () => {
     }
   };
 
-  // Fetch saved location or request new one
-  useEffect(() => {
-    const fetchLocation = async () => {
-      try {
-        const savedLocation = await AsyncStorage.getItem('userLocation');
-        if (savedLocation) {
-          setLocation(savedLocation);
-        } else {
-          let { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            setLocation('Permission denied');
-            return;
-          }
+  const handleProfilePress = () => {
+    navigation.navigate('Profile' as never);
+  };
 
-          let loc = await Location.getCurrentPositionAsync({});
-          let reverseGeocode = await Location.reverseGeocodeAsync({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-          });
-          if (reverseGeocode.length > 0) {
-            const { city, region } = reverseGeocode[0];
-            const locString = `${city || ''}, ${region || ''}`;
-            setLocation(locString);
-            await AsyncStorage.setItem('userLocation', locString);
-          } else {
-            setLocation('Location unavailable');
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching location:', error);
-        setLocation('Error fetching location');
-      }
-    };
+  const handleSettingsPress = () => {
+    navigation.navigate('Settings' as never);
+  };
 
-    fetchLocation();
-  }, []);
+  const displayName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Muvs Events';
+  const displayUsername = username ? `@${username}` : '@muvs_username';
 
   return (
     <ScrollView style={[styles.container, { backgroundColor }]}>
@@ -92,7 +112,7 @@ const OrganizerAccountScreen: React.FC = () => {
           ) : (
             <View style={[styles.profileCircle, { backgroundColor: accentColor }]}>
               <Text style={[styles.profileInitial, { color: '#fff' }]}>
-                {name.charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </Text>
             </View>
           )}
@@ -102,20 +122,39 @@ const OrganizerAccountScreen: React.FC = () => {
         {isEditing ? (
           <TextInput
             style={[styles.profileNameInput, { color: textColor }]}
-            value={name}
-            onChangeText={setName}
+            value={displayName}
+            onChangeText={(text) => {
+              const parts = text.split(' ');
+              setFirstName(parts[0] || '');
+              setLastName(parts.slice(1).join(' ') || '');
+            }}
             onBlur={() => setIsEditing(false)}
             autoFocus
           />
         ) : (
           <TouchableOpacity onLongPress={() => setIsEditing(true)}>
-            <Text style={[styles.profileName, { color: textColor }]}>{name}</Text>
+            <Text style={[styles.profileName, { color: textColor }]}>{displayName}</Text>
           </TouchableOpacity>
         )}
+
+        {/* Username */}
+        <Text style={[styles.username, { color: textColor }]}>{displayUsername}</Text>
 
         {/* Location */}
         <Text style={[styles.location, { color: textColor }]}>📍 {location}</Text>
       </View>
+
+      {/* Profile Button */}
+      <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
+        <Ionicons name="person-outline" size={20} color={accentColor} />
+        <Text style={[styles.itemText, { color: textColor }]}>View Profile</Text>
+      </TouchableOpacity>
+
+      {/* Settings Button */}
+      <TouchableOpacity style={styles.profileButton} onPress={handleSettingsPress}>
+        <Ionicons name="settings-outline" size={20} color={accentColor} />
+        <Text style={[styles.itemText, { color: textColor }]}>Settings</Text>
+      </TouchableOpacity>
 
       {/* Preferences Section */}
       <View style={styles.section}>
@@ -199,11 +238,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#ccc',
   },
+  username: { fontSize: 16, marginTop: 4 },
   location: { fontSize: 14, marginTop: 4 },
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
   item: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   itemText: { marginLeft: 12, fontSize: 16 },
+  profileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
   signOut: {
     flexDirection: 'row',
     alignItems: 'center',

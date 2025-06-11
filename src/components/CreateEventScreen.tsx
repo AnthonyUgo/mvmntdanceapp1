@@ -1,85 +1,80 @@
 import React, { useContext, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Keyboard,
-  Alert,
-  Platform
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Keyboard, Alert, Image, ScrollView } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import { launchImageLibraryAsync, MediaTypeOptions } from 'expo-image-picker';
 import { format } from 'date-fns';
+
+const API_URL = 'https://5167-2605-90-c057-590f-6217-b6f2-ee0a.ngrok-free.app/api/events';
+ // Replace with your backend URL
 
 const CreateEventScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-
-  const [eventName, setEventName] = useState('');
-  const [eventDate, setEventDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const [ticketPrice, setTicketPrice] = useState('');
-  const [ticketQuantity, setTicketQuantity] = useState(1);
-
   const backgroundColor = theme === 'dark' ? '#121212' : '#fff';
   const textColor = theme === 'dark' ? '#fff' : '#000';
   const accentColor = '#4285F4';
 
-  // Handle Date Picker
-  const onChangeDate = (_: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      // Only allow today's date
-      const today = new Date();
-      if (
-        selectedDate.getDate() === today.getDate() &&
-        selectedDate.getMonth() === today.getMonth() &&
-        selectedDate.getFullYear() === today.getFullYear()
-      ) {
-        setEventDate(selectedDate);
-      } else {
-        Alert.alert('Invalid Date', 'You can only select today’s date.');
-      }
+  const [eventName, setEventName] = useState('');
+  const [eventDate, setEventDate] = useState(new Date());
+  const [eventImage, setEventImage] = useState<string | null>(null);
+  const [ticketPrice, setTicketPrice] = useState('');
+  const [ticketQuantity, setTicketQuantity] = useState(1);
+  const [collaboratorEmail, setCollaboratorEmail] = useState('');
+
+  const pickImage = async () => {
+    const result = await launchImageLibraryAsync({ mediaTypes: MediaTypeOptions.Images, allowsEditing: true, quality: 0.7 });
+    if (!result.canceled && result.assets.length > 0) {
+      setEventImage(result.assets[0].uri);
     }
   };
 
-  // Handle Ticket Price Input
-  const handlePriceChange = (text: string) => {
-    // Remove non-numeric except dot
-    const cleaned = text.replace(/[^0-9.]/g, '');
-    const parts = cleaned.split('.');
-    let formatted = parts[0];
-    if (parts.length > 1) {
-      formatted += '.' + parts[1].slice(0, 2); // Limit to 2 decimal places
-    }
-    setTicketPrice(formatted);
-  };
-
-  // Increase ticket quantity
-  const increaseQuantity = () => setTicketQuantity((prev) => prev + 1);
-
-  // Decrease ticket quantity
-  const decreaseQuantity = () => {
-    if (ticketQuantity > 1) setTicketQuantity((prev) => prev - 1);
-  };
-
-  // Submit Handler
-  const handleSubmit = () => {
+  const handleSaveDraftOrPublish = async (isDraft: boolean) => {
     Keyboard.dismiss();
-    Alert.alert(
-      'Event Created',
-      `Name: ${eventName}\nDate: ${format(eventDate, 'PPPP')}\nPrice: $${ticketPrice}\nQuantity: ${ticketQuantity}`
-    );
+    if (!eventName || !eventDate) {
+      Alert.alert('Missing Info', 'Please fill all required fields.');
+      return;
+    }
+
+    const eventData = {
+      id: Date.now().toString(),
+      title: eventName,
+      date: eventDate.toISOString().split('T')[0],
+      price: ticketPrice,
+      quantity: ticketQuantity,
+      collaborator: collaboratorEmail,
+      image: eventImage,
+      draft: isDraft
+    };
+
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(eventData)
+      });
+      if (!response.ok) throw new Error('Failed to save event.');
+      Alert.alert(isDraft ? 'Draft Saved' : 'Event Published', `Event saved successfully.`);
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'Failed to save event.');
+    }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
+    <ScrollView style={[styles.container, { backgroundColor }]}>
       <Text style={[styles.title, { color: textColor }]}>Create Event</Text>
 
-      {/* Event Name */}
+      <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+        {eventImage ? (
+          <Image source={{ uri: eventImage }} style={styles.eventImage} />
+        ) : (
+          <View style={styles.placeholder}>
+            <Ionicons name="camera-outline" size={40} color={accentColor} />
+            <Text style={{ color: accentColor }}>Add Event Image</Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
       <TextInput
         style={[styles.input, { color: textColor, borderColor: accentColor }]}
         placeholder="Event Name"
@@ -88,26 +83,19 @@ const CreateEventScreen: React.FC = () => {
         onChangeText={setEventName}
       />
 
-      {/* Event Date */}
-      <TouchableOpacity
-        style={[styles.datePicker, { borderColor: accentColor }]}
-        onPress={() => setShowDatePicker(true)}
-      >
-        <Ionicons name="calendar-outline" size={24} color={accentColor} />
-        <Text style={[styles.dateText, { color: textColor }]}>
-          {format(eventDate, 'PPP')}
-        </Text>
-      </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePicker
-          value={eventDate}
-          mode="date"
-          display="default"
-          onChange={onChangeDate}
-        />
-      )}
+      <View style={[styles.datePickerContainer, { borderColor: accentColor }]}>
+        <Text style={[styles.label, { color: textColor }]}>Event Date:</Text>
+        <TouchableOpacity
+          onPress={() => Alert.alert('Coming Soon', 'Use a custom date picker here!')}
+          style={styles.datePickerDial}
+        >
+          <Text style={[styles.dateText, { color: textColor }]}>
+            {format(eventDate, 'PPP')}
+          </Text>
+          <Ionicons name="chevron-down-outline" size={20} color={accentColor} />
+        </TouchableOpacity>
+      </View>
 
-      {/* Ticket Price */}
       <View style={[styles.inputContainer, { borderColor: accentColor }]}>
         <Text style={[styles.dollarSign, { color: textColor }]}>$</Text>
         <TextInput
@@ -115,83 +103,86 @@ const CreateEventScreen: React.FC = () => {
           placeholder="0.00"
           placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
           value={ticketPrice}
-          onChangeText={handlePriceChange}
+          onChangeText={(text) => {
+            const cleaned = text.replace(/[^0-9.]/g, '');
+            const parts = cleaned.split('.');
+            let formatted = parts[0];
+            if (parts.length > 1) {
+              formatted += '.' + parts[1].slice(0, 2);
+            }
+            setTicketPrice(formatted);
+          }}
           keyboardType="decimal-pad"
         />
       </View>
 
-      {/* Ticket Quantity */}
       <View style={[styles.quantityContainer, { borderColor: accentColor }]}>
-        <TouchableOpacity onPress={decreaseQuantity}>
-          <Ionicons name="remove-circle-outline" size={28} color={accentColor} />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
-            // allow manual editing
-            Alert.prompt(
-              'Edit Quantity',
-              'Enter ticket quantity:',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
-                {
-                  text: 'OK',
-                  onPress: (input) => {
-                    const num = parseInt(input || '1', 10);
-                    if (!isNaN(num) && num > 0) {
-                      setTicketQuantity(num);
-                    }
-                  },
-                },
-              ],
-              'plain-text',
-              `${ticketQuantity}`,
-              'number-pad'
-            );
-          }}
-        >
-          <Text style={[styles.quantityText, { color: textColor }]}>{ticketQuantity}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={increaseQuantity}>
-          <Ionicons name="add-circle-outline" size={28} color={accentColor} />
-        </TouchableOpacity>
+        <Ionicons name="remove-circle-outline" size={28} color={accentColor} onPress={() => ticketQuantity > 1 && setTicketQuantity(ticketQuantity - 1)} />
+        <Text style={[styles.quantityText, { color: textColor }]}>{ticketQuantity}</Text>
+        <Ionicons name="add-circle-outline" size={28} color={accentColor} onPress={() => setTicketQuantity(ticketQuantity + 1)} />
       </View>
 
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[styles.submitButton, { backgroundColor: accentColor }]}
-        onPress={handleSubmit}
-      >
-        <Ionicons name="checkmark-outline" size={24} color="#fff" />
-        <Text style={styles.submitText}>Create Event</Text>
-      </TouchableOpacity>
-    </View>
+      <TextInput
+        style={[styles.input, { color: textColor, borderColor: accentColor }]}
+        placeholder="Invite Collaborator Email"
+        placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
+        value={collaboratorEmail}
+        onChangeText={setCollaboratorEmail}
+        keyboardType="email-address"
+      />
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.draftButton, { borderColor: accentColor }]}
+          onPress={() => handleSaveDraftOrPublish(true)}
+        >
+          <Ionicons name="save-outline" size={20} color={accentColor} />
+          <Text style={[styles.draftText, { color: accentColor }]}>Save Draft</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.publishButton, { backgroundColor: accentColor }]}
+          onPress={() => handleSaveDraftOrPublish(false)}
+        >
+          <Ionicons name="checkmark-outline" size={20} color="#fff" />
+          <Text style={styles.publishText}>Publish</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
   title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  imagePicker: {
+    height: 180,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  eventImage: { width: '100%', height: '100%' },
+  placeholder: { alignItems: 'center' },
   input: {
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 16,
-    fontSize: 16,
+    fontSize: 16
   },
-  datePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  datePickerContainer: {
     borderWidth: 1,
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
+    padding: 12,
+    marginBottom: 16
   },
-  dateText: { marginLeft: 12, fontSize: 16 },
+  datePickerDial: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  dateText: { fontSize: 16 },
+  label: { marginBottom: 4, fontWeight: '600' },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -199,7 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    marginBottom: 16,
+    marginBottom: 16
   },
   dollarSign: { fontSize: 18, marginRight: 8 },
   quantityContainer: {
@@ -210,17 +201,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 20,
+    marginBottom: 20
   },
   quantityText: { fontSize: 18, fontWeight: '600' },
-  submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  submitText: { color: '#fff', fontSize: 16, marginLeft: 8 },
+  buttonRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  draftButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, padding: 12, flex: 1, marginRight: 8 },
+  draftText: { marginLeft: 8, fontSize: 16 },
+  publishButton: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, padding: 12, flex: 1, marginLeft: 8 },
+  publishText: { color: '#fff', fontSize: 16, marginLeft: 8 }
 });
 
 export default CreateEventScreen;

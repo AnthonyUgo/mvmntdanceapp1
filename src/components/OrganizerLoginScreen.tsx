@@ -5,10 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert
+  Alert,
 } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
@@ -47,31 +48,44 @@ const OrganizerLoginScreen: React.FC = () => {
     }
 
     try {
-      const response = await fetch('https://c0a6-2605-ad80-90-c057-ed21-224a-23d1-b91.ngrok-free.app/api/auth/organizer/login', {
+      console.log('🚀 Logging in with:', { email, password });
+
+      const response = await fetch('http://100.110.138.201:5050/api/auth/organizer/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
 
       const text = await response.text();
+      console.log('🔍 Response Text:', text);
+
       let data;
       try {
         data = text ? JSON.parse(text) : {};
       } catch (err) {
-        console.error('Failed to parse JSON:', err);
-        console.error('Response Text:', text);
+        console.error('❌ JSON parse error:', err);
         Alert.alert('Server error.', 'Unexpected server response.');
         return;
       }
 
       if (response.ok) {
-        Alert.alert('Login successful!');
+         // Store user details locally for OrganizerAccountScreen
+      await AsyncStorage.setItem('userFirstName', data.firstName || '');
+      await AsyncStorage.setItem('userLastName', data.lastName || '');
+      await AsyncStorage.setItem('userUsername', data.username || '');
+      await AsyncStorage.setItem('userEmail', data.email || '');
+      await AsyncStorage.setItem('userCreatedAt', data.createdAt || '');
+      await AsyncStorage.setItem('userDob', data.dob || '');
+      await AsyncStorage.setItem('userGender', data.gender || '');
+      await AsyncStorage.setItem('userCreatedAt', data.createdAt || '');
+
+        Alert.alert('Login Successful!', 'Welcome back!');
         navigation.navigate('OrganizerDashboard' as never);
       } else {
-        Alert.alert('Login failed', data.error || 'Unknown error.');
+        Alert.alert('Login Failed', data.error || 'Unknown error.');
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('❌ Login error:', error);
       Alert.alert('Server error.', 'Please try again later.');
     }
   };
