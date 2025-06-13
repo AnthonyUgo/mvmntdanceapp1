@@ -77,7 +77,7 @@ const AuthScreen: React.FC = () => {
     }
 
     try {
-      const response = await fetch('https://b143-2605-ad80-90-c057-960-e89c-1695-c7c.ngrok-free.app/api/auth/login', {
+      const response = await fetch('https://17d2-2605-ad80-90-c057-a981-7b90-443d-2b3.ngrok-free.app/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),

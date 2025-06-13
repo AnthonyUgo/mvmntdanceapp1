@@ -53,10 +53,14 @@ export default function App() {
                 component={OrganizerLoginScreen}
                 options={{ headerShown: true, title: 'Organizer Login' }}
               />
-              <Stack.Screen
+             <Stack.Screen
                 name="OrganizerDashboard"
                 component={OrganizerDashboardScreen}
-                options={{ headerShown: true, title: 'Dashboard' }}
+                options={{ headerShown: true,
+                title: 'Dashboard',
+                headerBackVisible: false,  // 🔒 hides back button
+                gestureEnabled: false,     // 🔒 disables swipe back on iOS
+                }}
               />
               <Stack.Screen
                 name="Profile"

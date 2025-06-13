@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const { CosmosClient } = require('@azure/cosmos');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 console.log("🔍 COSMOS_DB_URI:", process.env.COSMOS_DB_URI);
@@ -179,17 +180,32 @@ router.post('/organizer/login', async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid email or password.' });
     }
+    // ✅ Generate JWT token
+    const token = jwt.sign(
+      {
+        id: organizer.id,
+        email: organizer.email,
+        role: organizer.role,
+        username: organizer.username
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
+    // ✅ Return token and organizer info
     res.status(200).json({
       message: 'Login successful!',
-      role: organizer.role,
-      firstName: organizer.firstName,
-      lastName: organizer.lastName,
-      username: organizer.username,
-      email: organizer.email,  // ✅ Added missing comma
-      dob: organizer.dob,
-      gender: organizer.gender,
-      createdAt: organizer.createdAt
+      token,
+      organizer: {
+        firstName: organizer.firstName,
+        lastName: organizer.lastName,
+        username: organizer.username,
+        email: organizer.email,
+        dob: organizer.dob,
+        gender: organizer.gender,
+        createdAt: organizer.createdAt,
+        role: organizer.role
+      }
     });
   } catch (err) {
     console.error(err);

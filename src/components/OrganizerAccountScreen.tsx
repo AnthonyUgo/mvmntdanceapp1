@@ -99,6 +99,19 @@ const OrganizerAccountScreen: React.FC = () => {
     navigation.navigate('Settings' as never);
   };
 
+  const handleSignOut = async () => {
+    try {
+      await AsyncStorage.clear();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Home' as never }],
+      });
+    } catch (err) {
+      console.error('Error during sign out:', err);
+      Alert.alert('Error', 'Failed to sign out.');
+    }
+  };
+
   const displayName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Muvs Events';
   const displayUsername = username ? `@${username}` : '@muvs_username';
 
@@ -205,7 +218,7 @@ const OrganizerAccountScreen: React.FC = () => {
 
       {/* Sign Out */}
       <View style={styles.section}>
-        <TouchableOpacity style={styles.signOut}>
+        <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={20} color={accentColor} />
           <Text style={[styles.itemText, { color: textColor }]}>Sign Out</Text>
         </TouchableOpacity>

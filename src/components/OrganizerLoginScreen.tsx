@@ -50,7 +50,7 @@ const OrganizerLoginScreen: React.FC = () => {
     try {
       console.log('🚀 Logging in with:', { email, password });
 
-      const response = await fetch('http://100.110.138.201:5050/api/auth/organizer/login', {
+      const response = await fetch('https://17d2-2605-ad80-90-c057-a981-7b90-443d-2b3.ngrok-free.app/api/auth/organizer/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -68,20 +68,21 @@ const OrganizerLoginScreen: React.FC = () => {
         return;
       }
 
-      if (response.ok) {
-         // Store user details locally for OrganizerAccountScreen
-      await AsyncStorage.setItem('userFirstName', data.firstName || '');
-      await AsyncStorage.setItem('userLastName', data.lastName || '');
-      await AsyncStorage.setItem('userUsername', data.username || '');
-      await AsyncStorage.setItem('userEmail', data.email || '');
-      await AsyncStorage.setItem('userCreatedAt', data.createdAt || '');
-      await AsyncStorage.setItem('userDob', data.dob || '');
-      await AsyncStorage.setItem('userGender', data.gender || '');
-      await AsyncStorage.setItem('userCreatedAt', data.createdAt || '');
+if (response.ok) {
+  const organizer = data.organizer;
 
-        Alert.alert('Login Successful!', 'Welcome back!');
-        navigation.navigate('OrganizerDashboard' as never);
-      } else {
+  await AsyncStorage.setItem('userFirstName', organizer.firstName || '');
+  await AsyncStorage.setItem('userLastName', organizer.lastName || '');
+  await AsyncStorage.setItem('userUsername', organizer.username || '');
+  await AsyncStorage.setItem('userEmail', organizer.email || '');
+  await AsyncStorage.setItem('userCreatedAt', organizer.createdAt || '');
+  await AsyncStorage.setItem('userDob', organizer.dob || '');
+  await AsyncStorage.setItem('userGender', organizer.gender || '');
+
+  Alert.alert('Login Successful!', 'Welcome back!');
+  navigation.navigate('OrganizerDashboard' as never);
+}
+ else {
         Alert.alert('Login Failed', data.error || 'Unknown error.');
       }
     } catch (error) {
