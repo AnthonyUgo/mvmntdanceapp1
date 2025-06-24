@@ -18,7 +18,7 @@ import { Picker } from '@react-native-picker/picker';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';  // Adjust path if needed
+import { RootStackParamList } from '../../App';
 
 type OrganizerSignUpNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -28,19 +28,21 @@ type OrganizerSignUpNavigationProp = NativeStackNavigationProp<
 const OrganizerSignUpScreen = () => {
   const { theme } = useContext(ThemeContext);
   const navigation = useNavigation<OrganizerSignUpNavigationProp>();
+
+  const [accountType, setAccountType] = useState<'user' | 'organizer'>('user');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [dob, setDob] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [gender, setGender] = useState('');
   const [acceptedTos, setAcceptedTos] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [message, setMessage] = useState('');
+  const [address, setAddress] = useState('');
 
-  // Password requirements
   const hasUppercase = /[A-Z]/.test(password);
   const hasNumber = /\d/.test(password);
   const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
@@ -62,6 +64,10 @@ const OrganizerSignUpScreen = () => {
       Alert.alert('Missing Fields', 'Please fill in all required fields.');
       return;
     }
+    if (accountType === 'organizer' && !address) {
+      Alert.alert('Missing Address', 'Please provide your address as an organizer.');
+      return;
+    }
     if (!acceptedTos) {
       Alert.alert('Terms Required', 'Please accept the Terms of Service.');
       return;
@@ -76,6 +82,8 @@ const OrganizerSignUpScreen = () => {
         password,
         dob,
         gender,
+        accountType,
+        ...(accountType === 'organizer' && { address }),
       };
 
       console.log('🚀 Submitting sign-up:', requestBody);
@@ -126,7 +134,37 @@ const OrganizerSignUpScreen = () => {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={[styles.card, { backgroundColor: cardColor, shadowColor: accentColor }]}>
-          <Text style={[styles.title, { color: accentColor }]}>Organizer Sign Up</Text>
+          <Text style={[styles.title, { color: accentColor }]}>Sign Up</Text>
+
+          {/* Account Type Toggle */}
+          <View style={{ marginBottom: 16 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: textColor }}>
+              Account Type
+            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  accountType === 'user' && styles.selectedOption,
+                ]}
+                onPress={() => setAccountType('user')}
+              >
+                <Text style={{ color: accountType === 'user' ? '#fff' : textColor }}>User</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  accountType === 'organizer' && styles.selectedOption,
+                ]}
+                onPress={() => setAccountType('organizer')}
+              >
+                <Text style={{ color: accountType === 'organizer' ? '#fff' : textColor }}>Organizer</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              You can update this later in your profile settings.
+            </Text>
+          </View>
 
           <TextInput
             placeholder="First Name"
@@ -159,7 +197,17 @@ const OrganizerSignUpScreen = () => {
             keyboardType="email-address"
           />
 
-          {/* Password Field with Toggle */}
+          {/* Address only for organizer */}
+          {accountType === 'organizer' && (
+            <TextInput
+              placeholder="Organizer Address"
+              placeholderTextColor="#aaa"
+              style={[styles.input, { color: textColor }]}
+              value={address}
+              onChangeText={setAddress}
+            />
+          )}
+
           <View style={styles.passwordContainer}>
             <TextInput
               placeholder="Password"
@@ -170,15 +218,10 @@ const OrganizerSignUpScreen = () => {
               secureTextEntry={!showPassword}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons
-                name={showPassword ? 'eye-off' : 'eye'}
-                size={24}
-                color={textColor}
-              />
+              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color={textColor} />
             </TouchableOpacity>
           </View>
 
-          {/* Password Requirements */}
           <View style={styles.passwordRequirements}>
             <Text style={{ color: hasUppercase ? 'green' : 'red' }}>• At least one uppercase letter</Text>
             <Text style={{ color: hasNumber ? 'green' : 'red' }}>• At least one number</Text>
@@ -186,7 +229,6 @@ const OrganizerSignUpScreen = () => {
             <Text style={{ color: hasMinLength ? 'green' : 'red' }}>• Minimum 9 characters</Text>
           </View>
 
-          {/* Date of Birth Picker */}
           <Pressable
             onPress={() => setShowDatePicker(true)}
             style={[
@@ -202,6 +244,7 @@ const OrganizerSignUpScreen = () => {
               {dob || 'Date of Birth (YYYY-MM-DD)'}
             </Text>
           </Pressable>
+
           {showDatePicker && (
             <DateTimePicker
               value={dob ? new Date(dob + 'T00:00:00') : new Date(2000, 0, 1)}
@@ -212,7 +255,6 @@ const OrganizerSignUpScreen = () => {
             />
           )}
 
-          {/* Gender Picker */}
           <Picker
             selectedValue={gender}
             style={[styles.picker, { color: textColor }]}
@@ -224,7 +266,6 @@ const OrganizerSignUpScreen = () => {
             <Picker.Item label="Other" value="other" />
           </Picker>
 
-          {/* Terms of Service Switch */}
           <View style={styles.switchContainer}>
             <Switch
               value={acceptedTos}
@@ -237,7 +278,6 @@ const OrganizerSignUpScreen = () => {
             </Text>
           </View>
 
-          {/* Sign Up Button */}
           <TouchableOpacity
             style={[
               styles.button,
@@ -292,6 +332,19 @@ const styles = StyleSheet.create({
   button: { borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   message: { textAlign: 'center', marginTop: 10 },
+  optionButton: {
+    flex: 1,
+    padding: 12,
+    marginHorizontal: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#aaa',
+    alignItems: 'center',
+  },
+  selectedOption: {
+    backgroundColor: '#a259ff',
+    borderColor: '#a259ff',
+  },
 });
 
 export default OrganizerSignUpScreen;

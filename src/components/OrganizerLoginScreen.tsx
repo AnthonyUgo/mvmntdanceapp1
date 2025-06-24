@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +20,6 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 
-// WebBrowser session
 WebBrowser.maybeCompleteAuthSession();
 
 type OrganizerLoginScreenNavigationProp = NativeStackNavigationProp<
@@ -30,7 +33,6 @@ const OrganizerLoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const navigation = useNavigation<OrganizerLoginScreenNavigationProp>();
 
-  // Google login (still here if needed)
   const [googleRequest, googleResponse, promptGoogleLogin] = Google.useIdTokenAuthRequest({
     clientId: '1074387332824-2j90gu9gldca4t19ddtg6k4ea27ecgev.apps.googleusercontent.com',
   });
@@ -40,125 +42,146 @@ const OrganizerLoginScreen: React.FC = () => {
   const inputBackground = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
   const accentColor = '#4285F4';
 
-  // Email login
   const handleEmailSignIn = async () => {
-    if (!email || !password) {
-      Alert.alert('Missing Fields', 'Please enter both email and password.');
+  if (!email || !password) {
+    Alert.alert('Missing Fields', 'Please enter both email and password.');
+    return;
+  }
+
+  try {
+    const response = await fetch('https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    const text = await response.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (err) {
+      Alert.alert('Server error.', 'Unexpected server response.');
       return;
     }
 
-    try {
-      console.log('🚀 Logging in with:', { email, password });
+    if (response.ok) {
+      const profile = data.profile || data.organizer;
 
-      const response = await fetch('https://17d2-2605-ad80-90-c057-a981-7b90-443d-2b3.ngrok-free.app/api/auth/organizer/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const text = await response.text();
-      console.log('🔍 Response Text:', text);
-
-      let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (err) {
-        console.error('❌ JSON parse error:', err);
-        Alert.alert('Server error.', 'Unexpected server response.');
+      if (!profile) {
+        Alert.alert('Login Failed', 'Profile not found in server response.');
         return;
       }
 
-if (response.ok) {
-  const organizer = data.organizer;
+      const basePairs: [string, string][] = [
+        ['userFirstName', profile.firstName || ''],
+        ['userLastName', profile.lastName || ''],
+        ['userUsername', profile.username || ''],
+        ['userEmail', profile.email || ''],
+        ['userCreatedAt', profile.createdAt || ''],
+        ['userDob', profile.dob || ''],
+        ['userGender', profile.gender || ''],
+        ['userRole', profile.role || ''],
+      ];
 
-  await AsyncStorage.setItem('userFirstName', organizer.firstName || '');
-  await AsyncStorage.setItem('userLastName', organizer.lastName || '');
-  await AsyncStorage.setItem('userUsername', organizer.username || '');
-  await AsyncStorage.setItem('userEmail', organizer.email || '');
-  await AsyncStorage.setItem('userCreatedAt', organizer.createdAt || '');
-  await AsyncStorage.setItem('userDob', organizer.dob || '');
-  await AsyncStorage.setItem('userGender', organizer.gender || '');
-
-  Alert.alert('Login Successful!', 'Welcome back!');
-  navigation.navigate('OrganizerDashboard' as never);
-}
- else {
-        Alert.alert('Login Failed', data.error || 'Unknown error.');
+      if (profile.role === 'organizer') {
+        basePairs.push(['organizerUsername', profile.username || '']);
       }
-    } catch (error) {
-      console.error('❌ Login error:', error);
-      Alert.alert('Server error.', 'Please try again later.');
+
+      await AsyncStorage.multiSet(basePairs);
+
+      Alert.alert('Login Successful!', 'Welcome back!');
+      setTimeout(() => {
+        if (profile.role === 'organizer') {
+          navigation.navigate('OrganizerDashboard' as never);
+        } else {
+          navigation.navigate('UserDashboard' as never);
+        }
+      }, 500);
+    } else {
+      Alert.alert('Login Failed', data.error || 'Unknown error.');
     }
-  };
+  } catch (error) {
+    Alert.alert('Server error.', 'Please try again later.');
+  }
+}; // ✅ this was missing
 
-  // Google login
-  const handleGoogleLogin = () => {
-    promptGoogleLogin();
-  };
-
-  // Sign Up
-  const handleSignUpPress = () => {
-    navigation.navigate('OrganizerSignUp' as never);
-  };
+  const handleGoogleLogin = () => promptGoogleLogin();
+  const handleSignUpPress = () => navigation.navigate('OrganizerSignUp' as never);
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
-      <Text style={[styles.title, { color: textColor }]}>Organizer Login</Text>
-      <Text style={[styles.subtitle, { color: textColor }]}>
-        Welcome! Please sign in to manage your events.
-      </Text>
-
-      {/* Login Form */}
-      <TextInput
-        style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
-        placeholder="Email"
-        placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
-        placeholder="Password"
-        placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-
-      {/* Sign In Button */}
-      <TouchableOpacity
-        style={[styles.signInButton, { backgroundColor: accentColor }]}
-        onPress={handleEmailSignIn}
-      >
-        <Ionicons name="log-in-outline" size={24} color="#fff" />
-        <Text style={[styles.signInButtonText, { color: '#fff' }]}>Sign In</Text>
-      </TouchableOpacity>
-
-      {/* Google Login Button */}
-      <TouchableOpacity
-        style={[styles.googleButton, { backgroundColor: inputBackground }]}
-        onPress={handleGoogleLogin}
-      >
-        <Ionicons name="logo-google" size={24} color={accentColor} />
-        <Text style={[styles.googleButtonText, { color: textColor }]}>
-          Continue with Google
-        </Text>
-      </TouchableOpacity>
-
-      {/* First Time? Sign Up */}
-      <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
-        <Text style={[styles.signUpText, { color: textColor }]}>
-          First time?{' '}
-          <Text style={{ color: accentColor, textDecorationLine: 'underline' }}>
-            Sign Up
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={[styles.container, { backgroundColor }]}>
+          <Text style={[styles.title, { color: textColor }]}>Login</Text>
+          <Text style={[styles.subtitle, { color: textColor }]}>
+            Welcome! Please sign in to view/manage events.
           </Text>
-        </Text>
-      </TouchableOpacity>
-    </View>
+
+          <TextInput
+            style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
+            placeholder="Email"
+            placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
+            placeholder="Password"
+            placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+
+          <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword' as never)}>
+            <Text style={{
+              color: accentColor,
+              textAlign: 'right',
+              marginTop: 4,
+              marginBottom: 8,
+              textDecorationLine: 'underline'
+            }}>
+              Forgot Password?
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.signInButton, { backgroundColor: accentColor }]}
+            onPress={handleEmailSignIn}
+          >
+            <Ionicons name="log-in-outline" size={24} color="#fff" />
+            <Text style={[styles.signInButtonText, { color: '#fff' }]}>Sign In</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.googleButton, { backgroundColor: inputBackground }]}
+            onPress={handleGoogleLogin}
+          >
+            <Ionicons name="logo-google" size={24} color={accentColor} />
+            <Text style={[styles.googleButtonText, { color: textColor }]}>
+              Continue with Google
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
+            <Text style={[styles.signUpText, { color: textColor }]}>
+              First time?{' '}
+              <Text style={{ color: accentColor, textDecorationLine: 'underline' }}>
+                Sign Up
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {

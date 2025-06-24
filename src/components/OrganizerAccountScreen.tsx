@@ -13,12 +13,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../contexts/ThemedContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import { isOrganizer } from '../utils/user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import { useIsFocused } from '@react-navigation/native';
 
 const OrganizerAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -26,6 +29,7 @@ const OrganizerAccountScreen: React.FC = () => {
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [location, setLocation] = useState<string>('Fetching location...');
   const [isEditing, setIsEditing] = useState(false);
+  const [viewAsUser, setViewAsUser] = useState(false);
 
   const backgroundColor = theme === 'dark' ? '#121212' : '#f9f9f9';
   const textColor = theme === 'dark' ? '#fff' : '#000';
@@ -37,10 +41,12 @@ const OrganizerAccountScreen: React.FC = () => {
         const storedFirstName = await AsyncStorage.getItem('userFirstName');
         const storedLastName = await AsyncStorage.getItem('userLastName');
         const storedUsername = await AsyncStorage.getItem('userUsername');
+        const storedImage = await AsyncStorage.getItem('userProfileImage');
 
         if (storedFirstName) setFirstName(storedFirstName);
         if (storedLastName) setLastName(storedLastName);
         if (storedUsername) setUsername(storedUsername);
+        if (storedImage) setProfileImage(storedImage);
 
         const savedLocation = await AsyncStorage.getItem('userLocation');
         if (savedLocation) {
@@ -71,8 +77,10 @@ const OrganizerAccountScreen: React.FC = () => {
       }
     };
 
-    fetchUserData();
-  }, []);
+    if (isFocused) {
+      fetchUserData();
+    }
+  }, [isFocused]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -88,6 +96,7 @@ const OrganizerAccountScreen: React.FC = () => {
     });
     if (!result.canceled && result.assets.length > 0) {
       setProfileImage(result.assets[0].uri);
+      await AsyncStorage.setItem('userProfileImage', result.assets[0].uri);
     }
   };
 
@@ -112,6 +121,10 @@ const OrganizerAccountScreen: React.FC = () => {
     }
   };
 
+  const handleToggleView = () => {
+    navigation.navigate('UserDashboard' as never);
+  };
+
   const displayName = firstName || lastName ? `${firstName} ${lastName}`.trim() : 'Muvs Events';
   const displayUsername = username ? `@${username}` : '@muvs_username';
 
@@ -131,7 +144,6 @@ const OrganizerAccountScreen: React.FC = () => {
           )}
         </TouchableOpacity>
 
-        {/* Editable Name */}
         {isEditing ? (
           <TextInput
             style={[styles.profileNameInput, { color: textColor }]}
@@ -150,20 +162,15 @@ const OrganizerAccountScreen: React.FC = () => {
           </TouchableOpacity>
         )}
 
-        {/* Username */}
         <Text style={[styles.username, { color: textColor }]}>{displayUsername}</Text>
-
-        {/* Location */}
         <Text style={[styles.location, { color: textColor }]}>📍 {location}</Text>
       </View>
 
-      {/* Profile Button */}
       <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
         <Ionicons name="person-outline" size={20} color={accentColor} />
         <Text style={[styles.itemText, { color: textColor }]}>View Profile</Text>
       </TouchableOpacity>
 
-      {/* Settings Button */}
       <TouchableOpacity style={styles.profileButton} onPress={handleSettingsPress}>
         <Ionicons name="settings-outline" size={20} color={accentColor} />
         <Text style={[styles.itemText, { color: textColor }]}>Settings</Text>
@@ -197,9 +204,15 @@ const OrganizerAccountScreen: React.FC = () => {
           <Ionicons name="cash-outline" size={20} color={accentColor} />
           <Text style={[styles.itemText, { color: textColor }]}>Financials</Text>
         </TouchableOpacity>
+
+        {/* Toggle Button for View Switching */}
+        <TouchableOpacity style={styles.item} onPress={handleToggleView}>
+          <Ionicons name="swap-horizontal-outline" size={20} color={accentColor} />
+          <Text style={[styles.itemText, { color: textColor }]}>Switch to User View</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Support & Legal Section */}
+      {/* Support & Legal */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: textColor }]}>Support & Legal</Text>
         <TouchableOpacity style={styles.item}>
@@ -216,7 +229,6 @@ const OrganizerAccountScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Sign Out */}
       <View style={styles.section}>
         <TouchableOpacity style={styles.signOut} onPress={handleSignOut}>
           <Ionicons name="log-out-outline" size={20} color={accentColor} />

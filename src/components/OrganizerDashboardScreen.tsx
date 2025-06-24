@@ -1,19 +1,34 @@
-import React, { useContext, useLayoutEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useContext, useLayoutEffect, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+
+type Ticket = {
+  purchased: boolean;
+  purchaserId?: string;
+  purchaserName?: string;
+  purchaseDate?: string;
+};
 
 const screenWidth = Dimensions.get('window').width;
+const API_URL = 'https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/events'; // 🔁 Update to your actual API
 
 const OrganizerDashboardScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-
-  // Updated hook: removes the second generic parameter so that TypeScript allows all defined screens
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [purchases, setPurchases] = useState<{ purchaser: string; date: string }[]>([]);
+  const [chartData, setChartData] = useState<number[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const bgColor = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
+  const textColor = theme === 'dark' ? '#fff' : '#000';
+  const primaryColor = '#4285F4';
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -22,7 +37,7 @@ const OrganizerDashboardScreen: React.FC = () => {
           <Ionicons
             name="person-circle-outline"
             size={28}
-            color={theme === 'dark' ? '#fff' : '#4285F4'}
+            color={theme === 'dark' ? '#fff' : primaryColor}
             style={{ marginRight: 16 }}
           />
         </TouchableOpacity>
@@ -30,52 +45,78 @@ const OrganizerDashboardScreen: React.FC = () => {
     });
   }, [navigation, theme]);
 
-  const ticketsData = [
-    { id: '1', purchaser: 'Jane Doe', date: '2025-06-08' },
-    { id: '2', purchaser: 'John Smith', date: '2025-06-09' },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const organizerId = await AsyncStorage.getItem('organizerUsername');
+        if (!organizerId) return;
 
-  const chartData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
-    datasets: [{ data: [10, 5, 8, 12, 7] }],
-  };
+        const res = await fetch(`${API_URL}?organizerId=${organizerId}&draft=false`);
+        const events = await res.json();
 
-  const bgColor = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
-  const textColor = theme === 'dark' ? '#fff' : '#000';
-  const primaryColor = '#4285F4';
+        const allPurchases: { purchaser: string; date: string }[] = [];
+        const purchaseCounts: Record<string, number> = {};
+
+        for (const event of events) {
+          (event.tickets || []).forEach((ticket: Ticket) => {
+  if (ticket.purchased) {
+    const date = ticket.purchaseDate?.split('T')[0] || event.date;
+    allPurchases.push({ purchaser: ticket.purchaserName || 'User', date });
+
+    purchaseCounts[date] = (purchaseCounts[date] || 0) + 1;
+  }
+});
+        }
+
+        // Sort and limit chart to last 5 days
+        const sortedDates = Object.keys(purchaseCounts).sort().slice(-5);
+        setChartData(sortedDates.map(date => purchaseCounts[date]));
+        setPurchases(allPurchases.slice(-5).reverse());
+      } catch (err) {
+        console.error('❌ Failed to load dashboard data:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#121212' : '#fff' }]}>
       {/* Analytics Section */}
       <View style={styles.analyticsSection}>
         <Text style={[styles.sectionTitle, { color: textColor }]}>Analytics</Text>
-        <LineChart
-          data={chartData}
-          width={screenWidth - 32}
-          height={220}
-          chartConfig={{
-            backgroundColor: bgColor,
-            backgroundGradientFrom: bgColor,
-            backgroundGradientTo: bgColor,
-            decimalPlaces: 0,
-            color: (opacity = 1) =>
-              theme === 'dark'
+        {loading ? (
+          <ActivityIndicator color={primaryColor} size="large" />
+        ) : (
+          <LineChart
+            data={{
+              labels: chartData.map((_, i) => `Day ${i + 1}`),
+              datasets: [{ data: chartData }],
+            }}
+            width={screenWidth - 32}
+            height={220}
+            chartConfig={{
+              backgroundColor: bgColor,
+              backgroundGradientFrom: bgColor,
+              backgroundGradientTo: bgColor,
+              decimalPlaces: 0,
+              color: (opacity = 1) => theme === 'dark'
                 ? `rgba(255,255,255,${opacity})`
                 : `rgba(66,133,244,${opacity})`,
-            labelColor: (opacity = 1) =>
-              theme === 'dark'
+              labelColor: (opacity = 1) => theme === 'dark'
                 ? `rgba(255,255,255,${opacity})`
                 : `rgba(0,0,0,${opacity})`,
-            propsForBackgroundLines: {
-              stroke: theme === 'dark' ? '#333' : '#ccc',
-            },
-          }}
-          bezier
-          style={styles.chart}
-        />
+              propsForBackgroundLines: { stroke: theme === 'dark' ? '#333' : '#ccc' },
+            }}
+            bezier
+            style={styles.chart}
+          />
+        )}
       </View>
 
-      {/* Create Event Button */}
+      {/* Create Event */}
       <TouchableOpacity
         style={[styles.button, { backgroundColor: bgColor }]}
         onPress={() => navigation.navigate('CreateEvent')}
@@ -87,16 +128,20 @@ const OrganizerDashboardScreen: React.FC = () => {
       {/* Recent Purchases */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: textColor }]}>Recent Purchases</Text>
-        {ticketsData.map((item) => (
-          <View key={item.id} style={styles.ticketItem}>
-            <Text style={[styles.ticketText, { color: textColor }]}>
-              {item.purchaser} - {item.date}
-            </Text>
-          </View>
-        ))}
+        {purchases.length === 0 ? (
+          <Text style={{ color: textColor, fontSize: 14 }}>No purchases yet.</Text>
+        ) : (
+          purchases.map((item, index) => (
+            <View key={index} style={styles.ticketItem}>
+              <Text style={[styles.ticketText, { color: textColor }]}>
+                {item.purchaser} - {item.date}
+              </Text>
+            </View>
+          ))
+        )}
       </View>
 
-      {/* View Events Button */}
+      {/* View Events */}
       <TouchableOpacity
         style={[styles.button, { backgroundColor: bgColor }]}
         onPress={() => navigation.navigate('MyEvents')}

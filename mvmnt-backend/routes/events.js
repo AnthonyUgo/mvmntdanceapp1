@@ -1,112 +1,134 @@
+// routes/events.js
 const express = require('express');
+const { eventsContainer } = require('../db');
+
 const router = express.Router();
-const { CosmosClient } = require('@azure/cosmos');
 
-const endpoint = process.env.COSMOS_DB_URI;
-const key = process.env.COSMOS_DB_KEY;
-const databaseId = process.env.COSMOS_DB_DATABASE;
-const containerId = process.env.COSMOS_DB_CONTAINER;
-const partitionKeyField = process.env.COSMOS_DB_PARTITION_KEY || undefined;
-
-const client = new CosmosClient({ endpoint, key });
-const container = client.database(databaseId).container(containerId);
-
-// Save or Update Event
+// CREATE or UPDATE EVENT
 router.post('/', async (req, res) => {
+  const {
+    id, title, date, startTime, endTime,
+    venueName, venueAddress, price, quantity,
+    collaborator, image, draft = false,
+    tickets = [], organizerId
+  } = req.body;
+
+  if (!organizerId || !id || !title || !date || !startTime || !endTime || !venueName || !venueAddress) {
+    return res.status(400).json({ error: 'Missing required event fields.' });
+  }
+
+  const eventData = {
+    id, title, date, startTime, endTime,
+    venueName, venueAddress, price, quantity,
+    collaborator, image, draft, tickets, organizerId
+  };
+
   try {
-    const eventData = req.body;
-
-    if (!eventData.id) {
-      return res.status(400).json({ error: 'Event ID is required.' });
-    }
-
-    if (partitionKeyField && !eventData[partitionKeyField]) {
-      return res.status(400).json({ error: `Missing partition key: ${partitionKeyField}` });
-    }
-
-    await container.items.upsert(eventData);
-    res.status(200).json({ message: 'Event saved/updated successfully.' });
-  } catch (error) {
-    console.error('Error saving event:', error);
-    res.status(500).json({ error: 'Failed to save/update event.' });
+    const { resource } = await eventsContainer.items.upsert(eventData, { partitionKey: organizerId });
+    res.json({ message: 'Event saved.', event: resource });
+  } catch (err) {
+    console.error('❌ Event save error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// Delete Event
+// DELETE EVENT
 router.delete('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { organizerId } = req.query;
+  if (!organizerId) {
+    return res.status(400).json({ error: 'organizerId required.' });
+  }
   try {
-    const { id } = req.params;
-    const partitionKey = req.query.partitionKey;
-
-    if (partitionKeyField && !partitionKey) {
-      return res.status(400).json({ error: `Partition key is required to delete this event.` });
-    }
-
-    if (partitionKeyField) {
-      await container.item(id, partitionKey).delete();
-    } else {
-      await container.item(id).delete();
-    }
-
-    res.status(200).json({ message: 'Event deleted successfully.' });
-  } catch (error) {
-    console.error('Error deleting event:', error);
-    res.status(500).json({ error: 'Failed to delete event.' });
+    await eventsContainer.item(id, organizerId).delete();
+    res.json({ message: 'Event deleted.' });
+  } catch (err) {
+    console.error('❌ Delete event error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// Get All Events (optional filter by draft)
+// GET ALL (by organizer)
 router.get('/', async (req, res) => {
+  const { organizerId, draft } = req.query;
+  if (!organizerId) return res.status(400).json({ error: 'organizerId required.' });
+
+  let query = 'SELECT * FROM c WHERE c.organizerId = @o';
+  const params = [{ name: '@o', value: organizerId }];
+  if (draft !== undefined) {
+    query += ' AND c.draft = @d';
+    params.push({ name: '@d', value: draft === 'true' });
+  }
+
   try {
-    const { draft } = req.query;
-    let querySpec = { query: 'SELECT * FROM c', parameters: [] };
-
-    if (draft !== undefined) {
-      querySpec.query += ' WHERE c.draft = @draft';
-      querySpec.parameters.push({ name: '@draft', value: draft === 'true' });
-    }
-
-    const { resources: events } = await container.items.query(querySpec).fetchAll();
-    res.status(200).json(events);
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    res.status(500).json({ error: 'Failed to fetch events.' });
+    const { resources } = await eventsContainer.items.query({ query, parameters: params }).fetchAll();
+    res.json(resources);
+  } catch (err) {
+    console.error('❌ Fetch events error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// Get Single Event
+// GET SINGLE
 router.get('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { organizerId } = req.query;
+  if (!organizerId) return res.status(400).json({ error: 'organizerId required.' });
+
   try {
-    const { id } = req.params;
-    const partitionKey = req.query.partitionKey;
-
-    const item = partitionKeyField ? container.item(id, partitionKey) : container.item(id);
-    const { resource } = await item.read();
-
-    if (!resource) {
-      return res.status(404).json({ error: 'Event not found.' });
-    }
-
-    res.status(200).json(resource);
-  } catch (error) {
-    console.error('Error fetching event:', error);
-    res.status(500).json({ error: 'Failed to fetch event.' });
+    const { resource } = await eventsContainer.item(id, organizerId).read();
+    if (!resource) return res.status(404).json({ error: 'Not found.' });
+    res.json(resource);
+  } catch (err) {
+    console.error('❌ Fetch event error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// Public Route - Live Events Only
-router.get('/public', async (req, res) => {
+// PUBLIC EVENTS
+router.get('/public', async (_req, res) => {
   try {
-    const querySpec = {
-      query: 'SELECT * FROM c WHERE c.draft = false',
-      parameters: []
-    };
+    const { resources } = await eventsContainer.items
+      .query({ query: 'SELECT * FROM c WHERE c.draft = false' })
+      .fetchAll();
+    res.json({ events: resources });
+  } catch (err) {
+    console.error('❌ Fetch public events error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
 
-    const { resources: events } = await container.items.query(querySpec).fetchAll();
-    res.status(200).json(events);
-  } catch (error) {
-    console.error('Error fetching live events:', error);
-    res.status(500).json({ error: 'Failed to fetch live events.' });
+// SAVED EVENTS
+router.post('/saved', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required.' });
+  try {
+    const { resources } = await eventsContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE ARRAY_CONTAINS(c.savedBy, @e)',
+        parameters: [{ name: '@e', value: email }]
+      }).fetchAll();
+    res.json({ events: resources });
+  } catch (err) {
+    console.error('❌ Fetch saved events error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// TICKETED EVENTS
+router.post('/tickets', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required.' });
+  try {
+    const { resources } = await eventsContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE EXISTS (SELECT VALUE t FROM t IN c.tickets WHERE t.email=@e)',
+        parameters: [{ name: '@e', value: email }]
+      }).fetchAll();
+    res.json({ events: resources });
+  } catch (err) {
+    console.error('❌ Fetch ticketed events error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 

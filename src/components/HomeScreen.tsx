@@ -47,7 +47,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Sign In Button */}
         <TouchableOpacity
           style={[styles.signInButton, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f0f0f0' }]}
-          onPress={() => navigation.navigate('Auth')}
+          onPress={() => navigation.navigate('OrganizerLogin')}
         >
           <Ionicons
             name="log-in-outline"

@@ -8,12 +8,14 @@ const { CosmosClient } = require('@azure/cosmos');
 
 const authRoutes = require('./routes/auth');
 const eventsRoutes = require('./routes/events');
+const userRoutes = require('./routes/user');
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/api/users', userRoutes);
 
 // Log environment variables (useful for debugging)
 console.log(`🔍 COSMOS_DB_URI: ${process.env.COSMOS_DB_URI ? 'Loaded' : 'Not found'}`);

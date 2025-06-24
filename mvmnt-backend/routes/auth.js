@@ -1,215 +1,215 @@
+// routes/auth.js
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { CosmosClient } = require('@azure/cosmos');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { usersContainer } = require('../db');
+
 const router = express.Router();
 
-console.log("🔍 COSMOS_DB_URI:", process.env.COSMOS_DB_URI);
-console.log("🔍 COSMOS_DB_KEY:", process.env.COSMOS_DB_KEY ? "Loaded" : "Missing");
-
-// Cosmos DB Setup
-const client = new CosmosClient({
-  endpoint: process.env.COSMOS_DB_URI,
-  key: process.env.COSMOS_DB_KEY,
-});
-const database = client.database(process.env.COSMOS_DB_DATABASE);
-const container = database.container(process.env.COSMOS_DB_CONTAINER);
-
-// =============================
-// REGULAR USER SIGNUP
-// =============================
+// SIGNUP
 router.post('/signup', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Please provide email and password' });
+  const { firstName, lastName, username, email, password, dob, gender, accountType, address } = req.body;
+  if (!firstName || !lastName || !username || !email || !password || !dob || !gender || !accountType) {
+    return res.status(400).json({ error: 'Missing required fields.' });
   }
-
+  if (accountType === 'organizer' && !address) {
+    return res.status(400).json({ error: 'Organizer address is required.' });
+  }
   try {
-    const { resources } = await container.items
+    const { resources } = await usersContainer.items
       .query({
-        query: 'SELECT * FROM c WHERE c.email = @email',
-        parameters: [{ name: '@email', value: email }],
-      })
-      .fetchAll();
+        query: 'SELECT c.id, c.username, c.email FROM c WHERE c.email=@e OR c.username=@u',
+        parameters: [{ name: '@e', value: email }, { name: '@u', value: username }]
+      }).fetchAll();
 
-    if (resources.length > 0) {
-      return res.status(400).json({ error: 'User already exists' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = {
-      id: email,
-      email,
-      password: hashedPassword,
-      role: 'user'
-    };
-
-    await container.items.create(newUser);
-
-    res.status(201).json({ message: 'User created successfully!' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// =============================
-// REGULAR USER LOGIN
-// =============================
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Please provide email and password.' });
-  }
-
-  try {
-    const { resources } = await container.items
-      .query({
-        query: 'SELECT * FROM c WHERE c.email = @email',
-        parameters: [{ name: '@email', value: email }],
-      })
-      .fetchAll();
-
-    if (resources.length === 0) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
-    }
-
-    const user = resources[0];
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
-    }
-
-    res.status(200).json({ message: 'Login successful!', role: user.role });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// =============================
-// ORGANIZER SIGNUP
-// =============================
-router.post('/organizer/signup', async (req, res) => {
-  console.log('Incoming signup request:', req.body);
-  const {
-    firstName,
-    lastName,
-    username,
-    email,
-    password,
-    dob,
-    gender
-  } = req.body;
-
-  if (!firstName || !lastName || !username || !email || !password || !dob || !gender) {
-    return res.status(400).json({ error: 'Please provide all required fields.' });
-  }
-
-  try {
-    const { resources } = await container.items
-      .query({
-        query: 'SELECT * FROM c WHERE c.email = @email OR c.username = @username',
-        parameters: [
-          { name: '@email', value: email },
-          { name: '@username', value: username }
-        ],
-      })
-      .fetchAll();
-
-    if (resources.length > 0) {
+    if (resources.length) {
       return res.status(400).json({ error: 'Email or username already exists.' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newOrganizer = {
+    const hashed = await bcrypt.hash(password, 10);
+    const newUser = {
       id: email,
       firstName,
       lastName,
       username,
       email,
-      password: hashedPassword,
+      password: hashed,
       dob,
       gender,
-      role: 'organizer',  // ✅ Added missing comma
-      createdAt: new Date().toISOString()  // ✅ Added account creation date
+      role: accountType,
+      createdAt: new Date().toISOString(),
+      verified: accountType === 'organizer' ? false : true,
+      verificationToken: accountType === 'organizer'
+        ? crypto.randomBytes(32).toString('hex') : null,
+      ...(accountType === 'organizer' && {
+        organizerData: { address, stripePayoutId: '', stripePaymentMethodId: '', events: [] }
+      })
     };
 
-    await container.items.create(newOrganizer, { partitionKey: username });
-
-    res.status(201).json({ message: 'Organizer account created successfully!' });
+    await usersContainer.items.create(newUser, { partitionKey: username });
+    res.status(201).json({ message: 'Account created. Verification email sent if organizer.' });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Signup error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 
-// =============================
-// ORGANIZER LOGIN
-// =============================
-router.post('/organizer/login', async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Please provide email and password.' });
-  }
-
+// EMAIL VERIFICATION
+router.post('/verify', async (req, res) => {
+  const { email, token } = req.body;
+  if (!email || !token) return res.status(400).json({ error: 'Missing email or token.' });
   try {
-    const { resources } = await container.items
+    const { resources } = await usersContainer.items
       .query({
-        query: 'SELECT * FROM c WHERE c.email = @email AND c.role = @role',
-        parameters: [
-          { name: '@email', value: email },
-          { name: '@role', value: 'organizer' }
-        ]
-      })
-      .fetchAll();
+        query: 'SELECT * FROM c WHERE c.email=@e AND c.verificationToken=@t',
+        parameters: [{ name: '@e', value: email }, { name: '@t', value: token }]
+      }).fetchAll();
+    if (!resources.length) return res.status(400).json({ error: 'Invalid token.' });
 
-    if (resources.length === 0) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
+    const user = resources[0];
+    user.verified = true;
+    user.verificationToken = null;
+    await usersContainer.items.upsert(user, { partitionKey: user.username });
+    res.json({ message: 'Email verified successfully.' });
+  } catch (err) {
+    console.error('❌ Verify error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// LOGIN
+router.post('/login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: 'Missing fields.' });
+  try {
+    const { resources } = await usersContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.email=@e',
+        parameters: [{ name: '@e', value: email }]
+      }).fetchAll();
+    if (!resources.length) return res.status(400).json({ error: 'Invalid credentials.' });
+
+    const user = resources[0];
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(400).json({ error: 'Invalid credentials.' });
+    if (user.role === 'organizer' && !user.verified) {
+      return res.status(403).json({ error: 'Please verify your email.' });
     }
 
-    const organizer = resources[0];
-    const isMatch = await bcrypt.compare(password, organizer.password);
-
-    if (!isMatch) {
-      return res.status(400).json({ error: 'Invalid email or password.' });
+    const role = user.role || 'user';
+    if (role === 'organizer' && !user.organizerData) {
+      user.organizerData = { address: '', stripePayoutId: '', stripePaymentMethodId: '', events: [] };
+      await usersContainer.items.upsert(user, { partitionKey: user.username });
     }
-    // ✅ Generate JWT token
+
     const token = jwt.sign(
-      {
-        id: organizer.id,
-        email: organizer.email,
-        role: organizer.role,
-        username: organizer.username
-      },
+      { id: user.id, email: user.email, role },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // ✅ Return token and organizer info
-    res.status(200).json({
-      message: 'Login successful!',
+    res.json({
+      message: 'Login successful.',
       token,
-      organizer: {
-        firstName: organizer.firstName,
-        lastName: organizer.lastName,
-        username: organizer.username,
-        email: organizer.email,
-        dob: organizer.dob,
-        gender: organizer.gender,
-        createdAt: organizer.createdAt,
-        role: organizer.role
+      profile: {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        email: user.email,
+        dob: user.dob,
+        gender: user.gender,
+        createdAt: user.createdAt,
+        role,
+        ...(role === 'organizer' && { organizerData: user.organizerData })
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Login error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// FORGOT PASSWORD
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required.' });
+  try {
+    const { resources } = await usersContainer.items
+      .query({ query: 'SELECT * FROM c WHERE c.email=@e', parameters: [{ name: '@e', value: email }] })
+      .fetchAll();
+    if (!resources.length) return res.status(404).json({ error: 'Email not found.' });
+
+    const user = resources[0];
+    user.resetToken = crypto.randomBytes(32).toString('hex');
+    user.resetExpires = Date.now() + 15 * 60 * 1000;
+    await usersContainer.items.upsert(user, { partitionKey: user.username });
+
+    res.json({ message: 'Password reset email sent.' });
+  } catch (err) {
+    console.error('❌ Forgot-password error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// RESET PASSWORD
+router.post('/reset-password', async (req, res) => {
+  const { email, token, newPassword } = req.body;
+  if (!email || !token || !newPassword) {
+    return res.status(400).json({ error: 'Missing fields.' });
+  }
+  try {
+    const { resources } = await usersContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.email=@e AND c.resetToken=@t',
+        parameters: [{ name: '@e', value: email }, { name: '@t', value: token }]
+      }).fetchAll();
+    if (!resources.length) return res.status(400).json({ error: 'Invalid or expired token.' });
+
+    const user = resources[0];
+    if (Date.now() > user.resetExpires) {
+      return res.status(400).json({ error: 'Token expired.' });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetToken = null;
+    user.resetExpires = null;
+    await usersContainer.items.upsert(user, { partitionKey: user.username });
+    res.json({ message: 'Password reset successful.' });
+  } catch (err) {
+    console.error('❌ Reset-password error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// BECOME ORGANIZER
+router.post('/become-organizer', async (req, res) => {
+  const { username, address } = req.body;
+  if (!username || !address) {
+    return res.status(400).json({ error: 'Username and address required.' });
+  }
+  try {
+    const { resources } = await usersContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.username=@u',
+        parameters: [{ name: '@u', value: username }]
+      }).fetchAll();
+    if (!resources.length) return res.status(404).json({ error: 'User not found.' });
+    const user = resources[0];
+    if (user.role === 'organizer') {
+      return res.status(400).json({ error: 'Already an organizer.' });
+    }
+
+    user.role = 'organizer';
+    user.verified = false;
+    user.verificationToken = crypto.randomBytes(32).toString('hex');
+    user.organizerData = { address, stripePayoutId: '', stripePaymentMethodId: '', events: [] };
+    await usersContainer.items.upsert(user, { partitionKey: user.username });
+
+    res.json({ message: 'Upgrade initiated. Check email to verify.' });
+  } catch (err) {
+    console.error('❌ Become-organizer error:', err);
+    res.status(500).json({ error: 'Server error.' });
   }
 });
 

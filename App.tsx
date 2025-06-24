@@ -4,15 +4,18 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './src/components/HomeScreen';
 import AuthScreen from './src/components/AuthScreen';
 import OrganizerLoginScreen from './src/components/OrganizerLoginScreen';
-import OrganizerAccountScreen from './src/components/OrganizerAccountScreen'; // ✅ NEW SCREEN
-import OrganizerDashboardScreen from './src/components/OrganizerDashboardScreen'; // Assuming you already have this
+import OrganizerAccountScreen from './src/components/OrganizerAccountScreen';
+import OrganizerDashboardScreen from './src/components/OrganizerDashboardScreen';
 import ProfileScreen from './src/components/ProfileScreen';
 import SettingsScreen from './src/components/SettingScreen';
 import CreateEventScreen from './src/components/CreateEventScreen';
-import MyEventScreen from './src/components/MyEventScreen'
+import MyEventScreen from './src/components/MyEventScreen';
 import ManageEventScreen from './src/components/ManageEventScreen';
 import OrganizerSignUpScreen from './src/components/OrganizerSignUpScreen';
+import UserTabNavigator from './src/components/UserTabNavigator'; // ✅ NEW: Tab container for user screens
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
+import 'react-native-get-random-values';
+import ForgotPasswordScreen from './src/components/ForgotPasswordScreen';
 
 // 1️⃣ Define your stack param list
 export type RootStackParamList = {
@@ -23,10 +26,13 @@ export type RootStackParamList = {
   OrganizerSignUp: undefined;
   OrganizerDashboard: undefined;
   CreateEvent: undefined;
+  ForgotPassword: undefined;
   Profile: undefined;
   Settings: undefined;
-  MyEvents: undefined;
+  MyEvents: { initialTab?: 'live' | 'drafts' | 'past' } | undefined;
   ManageEvent: { eventId: string; isCollaborator?: boolean };
+  WebviewScreen: { url: string };
+  UserDashboard: undefined; // ✅ NEW route
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -51,15 +57,16 @@ export default function App() {
               <Stack.Screen
                 name="OrganizerLogin"
                 component={OrganizerLoginScreen}
-                options={{ headerShown: true, title: 'Organizer Login' }}
+                options={{ headerShown: true, title: 'Login' }}
               />
-             <Stack.Screen
+              <Stack.Screen
                 name="OrganizerDashboard"
                 component={OrganizerDashboardScreen}
-                options={{ headerShown: true,
-                title: 'Dashboard',
-                headerBackVisible: false,  // 🔒 hides back button
-                gestureEnabled: false,     // 🔒 disables swipe back on iOS
+                options={{
+                  headerShown: true,
+                  title: 'Dashboard',
+                  headerBackVisible: false,
+                  gestureEnabled: false,
                 }}
               />
               <Stack.Screen
@@ -71,7 +78,7 @@ export default function App() {
                 name="Settings"
                 component={SettingsScreen}
                 options={{ headerShown: true, title: 'Settings' }}
-              /> 
+              />
               <Stack.Screen
                 name="OrganizerSignUp"
                 component={OrganizerSignUpScreen}
@@ -81,8 +88,8 @@ export default function App() {
                 name="CreateEvent"
                 component={CreateEventScreen}
                 options={{ headerShown: true, title: 'Create Event' }}
-             />
-             <Stack.Screen
+              />
+              <Stack.Screen
                 name="MyEvents"
                 component={MyEventScreen}
                 options={{ headerShown: true, title: 'My Events' }}
@@ -97,7 +104,16 @@ export default function App() {
                 component={ManageEventScreen}
                 options={{ headerShown: true, title: 'Manage Event' }}
               />
-              
+              <Stack.Screen
+                name="ForgotPassword"
+                component={ForgotPasswordScreen}
+                options={{ headerShown: true, title: 'Forgot Password' }}
+              />
+              <Stack.Screen
+                name="UserDashboard"
+                component={UserTabNavigator} // ✅ This is your tab screen container
+                options={{ headerShown: false }}
+              />
             </Stack.Navigator>
           </NavigationContainer>
         )}
