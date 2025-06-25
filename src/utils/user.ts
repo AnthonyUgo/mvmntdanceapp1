@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'https://a3a3-2605-ad80-90-c057-4402-8f6e-3b87-c3c6.ngrok-free.app/api';
+const API_URL = 'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api';
 
 export const getUserFromBackend = async (
   setUser: Function,

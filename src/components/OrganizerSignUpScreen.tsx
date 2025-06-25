@@ -98,7 +98,7 @@ const OrganizerSignUpScreen: React.FC = () => {
 
     try {
       const res = await fetch(
-        'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/auth/signup',
+        'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/auth/signup',
         { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }
       );
       const data = await res.json();

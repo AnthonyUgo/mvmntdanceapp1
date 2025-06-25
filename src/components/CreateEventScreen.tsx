@@ -100,7 +100,7 @@ const CreateEventScreen: React.FC = () => {
 
     try {
       const res = await fetch(
-        'https://your-ngrok-url/api/events',
+        'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events',
         {
           method:'POST',
           headers:{'Content-Type':'application/json'},

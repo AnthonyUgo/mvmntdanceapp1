@@ -29,7 +29,7 @@ type EventType = {
 };
 
 const PUBLIC_EVENTS_URL =
-  'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/events/public';
+  'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events/public';
 
 const DiscoverScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
