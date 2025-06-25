@@ -19,7 +19,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 
 // Define Event type
-const API_URL = 'https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/events';
+const API_URL = 'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/events';
 
 type Event = {
   id: string;
@@ -39,8 +39,7 @@ const MyEventsScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'MyEvents'>>();
   const route = useRoute<RouteProp<RootStackParamList, 'MyEvents'>>();
-const initialTab = route.params?.initialTab || 'live';
-
+  const initialTab = route.params?.initialTab || 'live';
 
   const [events, setEvents] = useState<Event[]>([]);
   const [search, setSearch] = useState('');
@@ -68,62 +67,70 @@ const initialTab = route.params?.initialTab || 'live';
   const fetchEvents = async () => {
     try {
       const organizerId = await AsyncStorage.getItem('organizerUsername');
-      if (!organizerId) return console.warn('Organizer ID not found');
+      if (!organizerId) {
+        console.warn('Organizer ID not found');
+        return;
+      }
 
       const response = await fetch(`${API_URL}?organizerId=${organizerId}&_=${Date.now()}`, {
         headers: { 'Cache-Control': 'no-cache' }
       });
+      if (!response.ok) {
+        console.warn('Failed to fetch events');
+        return;
+      }
 
-      if (!response.ok) return console.warn('Failed to fetch events');
-      const rawEvents = await response.json();
+      // ➊ parse
+      const data = await response.json();
+      // ➋ normalize to an array
+      const rawEventsArray: any[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data.events)
+          ? data.events
+          : [];
 
       const normalizeTime = (time: string): string => {
-  if (!time) return '00:00';
-  try {
-    const try24h = new Date(`1970-01-01T${time}`);
-    if (!isNaN(try24h.getTime())) {
-      return time.length === 5 ? time : try24h.toISOString().split('T')[1].slice(0, 5);
-    }
+        if (!time) return '00:00';
+        try {
+          const t24 = new Date(`1970-01-01T${time}`);
+          if (!isNaN(t24.getTime())) {
+            return time.length === 5 ? time : t24.toISOString().substr(11, 5);
+          }
+          const t12 = new Date(`1970-01-01 ${time}`);
+          if (!isNaN(t12.getTime())) {
+            return t12.toISOString().substr(11, 5);
+          }
+        } catch {
+          console.warn('⛔ Bad time format:', time);
+        }
+        return '00:00';
+      };
 
-    // Try parsing 12-hour format
-    const try12h = new Date(`1970-01-01 ${time}`);
-    if (!isNaN(try12h.getTime())) {
-      return try12h.toISOString().split('T')[1].slice(0, 5);
-    }
-  } catch {
-    console.warn('⛔ Bad time format:', time);
-  }
-  return '00:00';
-};
+      // ➌ map + normalize each
+      const normalized: Event[] = rawEventsArray.map((e: any) => {
+        const safeDate  = e.date || '1970-01-01';
+        const safeStart = normalizeTime(e.startTime);
+        const safeEnd   = normalizeTime(e.endTime);
+        if (!e.date || !e.startTime || !e.endTime) {
+          console.warn('❗ Skipping invalid event:', e);
+        }
+        return {
+          ...e,
+          date:      safeDate,
+          startTime: safeStart,
+          endTime:   safeEnd,
+          draft:     e.draft ?? false,
+          venue:     e.venue || { name: e.venueName || '', address: e.venueAddress || '' }
+        };
+      });
 
-const normalized: Event[] = rawEvents.map((e: any) => {
-  const safeDate = e.date || '1970-01-01';
-  const safeStart = normalizeTime(e.startTime);
-  const safeEnd = normalizeTime(e.endTime);
+      // ➍ sort by date/time
+      normalized.sort((a, b) =>
+        new Date(`${a.date}T${a.startTime}`).getTime() -
+        new Date(`${b.date}T${b.startTime}`).getTime()
+      );
 
-  if (!e.date || !e.startTime || !e.endTime) {
-    console.warn('❗ Skipping invalid event:', e);
-  }
-
-  return {
-    ...e,
-    date: safeDate,
-    startTime: safeStart,
-    endTime: safeEnd,
-    draft: e.draft ?? false,
-    venue: e.venue || { name: e.venueName || '', address: e.venueAddress || '' }
-  };
-});
-
-
-// Now sort and update state
-normalized.sort((a, b) =>
-  new Date(`${a.date}T${a.startTime}`).getTime() -
-  new Date(`${b.date}T${b.startTime}`).getTime()
-);
-
-setEvents(normalized);
-
+      setEvents(normalized);
     } catch (err) {
       console.error('❌ Failed to load events:', err);
     } finally {
@@ -133,6 +140,7 @@ setEvents(normalized);
   };
 
   useFocusEffect(useCallback(() => {
+    setLoading(true);
     fetchEvents();
     setActiveTab(route.params?.initialTab || 'live');
   }, [route.params?.initialTab]));
@@ -151,9 +159,9 @@ setEvents(normalized);
   const filteredEvents = events
     .filter(e => {
       const start = new Date(`${e.date}T${e.startTime || '00:00'}`);
-      const end = new Date(`${e.date}T${e.endTime || '23:59'}`);
-      if (activeTab === 'live') return !e.draft && end >= now;
-      if (activeTab === 'past') return !e.draft && end < now;
+      const end   = new Date(`${e.date}T${e.endTime || '23:59'}`);
+      if (activeTab === 'live')   return !e.draft && end >= now;
+      if (activeTab === 'past')   return !e.draft && end < now;
       if (activeTab === 'drafts') return e.draft;
       return false;
     })
@@ -161,12 +169,12 @@ setEvents(normalized);
 
   const getCountdownLabel = (event: Event) => {
     const start = new Date(`${event.date}T${event.startTime}`);
-    const end = new Date(`${event.date}T${event.endTime}`);
-    const diff = start.getTime() - now.getTime();
+    const end   = new Date(`${event.date}T${event.endTime}`);
     if (now >= start && now <= end) return <Text style={styles.liveLabel}>NOW</Text>;
+    const diff = start.getTime() - now.getTime();
     if (diff <= 0) return null;
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+    const days  = Math.floor(diff / 86400000);
+    const hours = Math.floor(diff / 3600000) % 24;
     return <Text style={styles.countdown}>{days > 0 ? `${days}d` : `${hours}h`}</Text>;
   };
 
@@ -204,7 +212,7 @@ setEvents(normalized);
             onPress={() => setActiveTab(tab as any)}
             style={[styles.tab, activeTab === tab && { borderBottomColor: accentColor }]}
           >
-            <Text style={[styles.tabText, { color: activeTab === tab ? accentColor : textColor }]}>              
+            <Text style={[styles.tabText, { color: activeTab === tab ? accentColor : textColor }]}>
               {tab[0].toUpperCase() + tab.slice(1)}
             </Text>
           </TouchableOpacity>
@@ -217,30 +225,40 @@ setEvents(normalized);
         <FlatList
           data={filteredEvents}
           keyExtractor={item => item.id}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchEvents(); }} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => { setRefreshing(true); fetchEvents(); }}
+            />
+          }
           renderItem={({ item }) => {
-            const mapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.venue.address)}`;
+            const mapLink =
+              `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(item.venue.address)}`;
             return (
-              <TouchableOpacity onPress={() => handleManageEvent(item)} onLongPress={() => item.draft && handleDeleteDraft(item.id)}>
+              <TouchableOpacity
+                onPress={() => handleManageEvent(item)}
+                onLongPress={() => item.draft && handleDeleteDraft(item.id)}
+              >
                 <View style={[styles.ticketCard, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#fff' }]}>
                   <View style={styles.ticketHeader}>
                     <Text style={[styles.eventTitle, { color: textColor }]}>{item.title}</Text>
                     {getCountdownLabel(item)}
                   </View>
-
-                   <Text style={{ color: textColor, fontSize: 12, marginBottom: 4 }}> 
+                  <Text style={{ color: textColor, fontSize: 12, marginBottom: 4 }}>
                     {item.date} • {formatTime12h(item.startTime)} – {formatTime12h(item.endTime)}
-                   </Text>
-
+                  </Text>
                   <Text style={{ color: accentColor, fontSize: 12, marginBottom: 8 }}>
                     {item.tickets?.filter(t => t.purchased).length || 0}/{item.quantity} tickets sold
                   </Text>
-
                   {item.venue.name && item.venue.address && (
-                    <TouchableOpacity onPress={() => navigation.navigate('WebviewScreen', { url: mapLink })}>
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('WebviewScreen', { url: mapLink })}
+                    >
                       <View style={styles.venueChip}>
                         <Ionicons name="location-outline" size={14} color="#fff" />
-                        <Text style={styles.venueText}>{item.venue.name} • {item.venue.address}</Text>
+                        <Text style={styles.venueText}>
+                          {item.venue.name} • {item.venue.address}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -248,7 +266,11 @@ setEvents(normalized);
               </TouchableOpacity>
             );
           }}
-          ListEmptyComponent={<Text style={{ color: textColor, textAlign: 'center', marginTop: 20 }}>No events found.</Text>}
+          ListEmptyComponent={
+            <Text style={{ color: textColor, textAlign: 'center', marginTop: 20 }}>
+              No events found.
+            </Text>
+          }
         />
       )}
     </View>
@@ -259,81 +281,50 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
   headerTitle: { fontSize: 24, fontWeight: 'bold' },
-  addButton: {
-    backgroundColor: '#4285F4',
-    borderRadius: 24,
-    padding: 8
-  },
+  addButton: { backgroundColor: '#4285F4', borderRadius: 24, padding: 8 },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 16, paddingHorizontal: 12,
+    paddingVertical: 8, borderRadius: 8,
     marginBottom: 16
   },
   searchInput: { marginLeft: 8, flex: 1, fontSize: 16 },
   tabContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#ccc'
+    flexDirection: 'row', justifyContent: 'center',
+    borderBottomWidth: 1, borderColor: '#ccc'
   },
   tab: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent'
+    paddingVertical: 12, paddingHorizontal: 24,
+    borderBottomWidth: 2, borderBottomColor: 'transparent'
   },
   tabText: { fontSize: 16, fontWeight: '600' },
   ticketCard: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    padding: 16,
-    borderRadius: 12,
-    borderLeftWidth: 6,
-    borderColor: '#4285F4',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
+    marginHorizontal: 16, marginVertical: 8,
+    padding: 16, borderRadius: 12,
+    borderLeftWidth: 6, borderColor: '#4285F4',
+    shadowColor: '#000', shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2
+    shadowRadius: 4, elevation: 2
   },
   ticketHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eventTitle: { fontSize: 16, fontWeight: 'bold', flex: 1, marginRight: 8 },
   countdown: {
-    backgroundColor: '#ddd',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    fontSize: 12,
-    color: '#000'
+    backgroundColor: '#ddd', paddingHorizontal: 8,
+    paddingVertical: 4, borderRadius: 6,
+    fontSize: 12, color: '#000'
   },
   liveLabel: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#00C853',
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold'
+    paddingHorizontal: 10, paddingVertical: 4,
+    borderRadius: 8, backgroundColor: '#00C853',
+    color: '#fff', fontSize: 12, fontWeight: 'bold'
   },
   venueChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4285F4',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-    marginTop: 4
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#4285F4', borderRadius: 6,
+    paddingHorizontal: 10, paddingVertical: 6,
+    alignSelf: 'flex-start', marginTop: 4
   },
-  venueText: {
-    color: '#fff',
-    fontSize: 12,
-    marginLeft: 4
-  }
+  venueText: { color: '#fff', fontSize: 12, marginLeft: 4 }
 });
 
 export default MyEventsScreen;

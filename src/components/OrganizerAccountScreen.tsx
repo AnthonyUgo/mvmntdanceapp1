@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useIsFocused } from '@react-navigation/native';
 
+const API_URL = 'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api';
 const OrganizerAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const navigation = useNavigation();
@@ -38,15 +39,23 @@ const OrganizerAccountScreen: React.FC = () => {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const storedFirstName = await AsyncStorage.getItem('userFirstName');
-        const storedLastName = await AsyncStorage.getItem('userLastName');
-        const storedUsername = await AsyncStorage.getItem('userUsername');
-        const storedImage = await AsyncStorage.getItem('userProfileImage');
-
-        if (storedFirstName) setFirstName(storedFirstName);
-        if (storedLastName) setLastName(storedLastName);
-        if (storedUsername) setUsername(storedUsername);
-        if (storedImage) setProfileImage(storedImage);
+        const email = await AsyncStorage.getItem('userEmail');
+        if (email) {
+           try {
+             const res = await fetch(`${API_URL}/users/get?email=${email}`);
+             if (res.ok) {
+               const { user } = await res.json();
+               setFirstName(user.firstName);
+               setLastName(user.lastName);
+               setUsername(user.username);
+               setProfileImage(user.profileImage);        // ← now you’re using the blob URL
+              // optional: cache locally for quick loads
+              await AsyncStorage.setItem('userProfileImage', user.profileImage);
+             }
+            } catch (err) {
+              console.error('❌ Could not fetch profile:', err);
+            }
+        }
 
         const savedLocation = await AsyncStorage.getItem('userLocation');
         if (savedLocation) {

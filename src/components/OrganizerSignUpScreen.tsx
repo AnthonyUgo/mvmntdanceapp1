@@ -1,350 +1,316 @@
 import React, { useState, useContext } from 'react';
-import { Ionicons } from '@expo/vector-icons';
 import {
   View,
-  TextInput,
   Text,
+  TextInput,
   TouchableOpacity,
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
-  Pressable,
   Alert,
   Switch,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
 
-type OrganizerSignUpNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'OrganizerSignUp'
->;
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'OrganizerSignUp'>;
 
-const OrganizerSignUpScreen = () => {
+const accent = '#a259ff';
+
+const OrganizerSignUpScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const navigation = useNavigation<OrganizerSignUpNavigationProp>();
+  const navigation = useNavigation<NavProp>();
 
-  const [accountType, setAccountType] = useState<'user' | 'organizer'>('user');
+  // Core fields
   const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [username, setUsername] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
-  const [acceptedTos, setAcceptedTos] = useState(false);
+  const [lastName, setLastName]   = useState('');
+  const [username, setUsername]   = useState('');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [message, setMessage] = useState('');
-  const [address, setAddress] = useState('');
 
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  const hasMinLength = password.length >= 9;
+  // DOB picker
+  const [dob, setDob] = useState<string>('');
+  const [showDobPicker, setShowDobPicker] = useState(false);
 
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      const formattedDate = selectedDate.toISOString().split('T')[0];
-      setDob(formattedDate);
-      if (selectedDate.toDateString() === new Date().toDateString()) {
+  // Gender picker
+  const [gender, setGender] = useState<string>('');
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
+
+  // Account type toggle
+  const [accountType, setAccountType] = useState<'user'|'organizer'>('user');
+
+  // Organizer extras
+  const [phone, setPhone] = useState('');
+  const [street, setStreet]     = useState('');
+  const [unit, setUnit]         = useState('');
+  const [city, setCity]         = useState('');
+  const [stateCode, setStateCode] = useState('');
+  const [zip, setZip]           = useState('');
+
+  // Terms
+  const [accepted, setAccepted] = useState(false);
+
+  // Validation markers
+  const hasUpper = /[A-Z]/.test(password);
+  const hasNum   = /\d/.test(password);
+  const hasSpec  = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  const hasLen   = password.length >= 9;
+
+  const onDobChange = (_: any, date?: Date) => {
+    setShowDobPicker(false);
+    if (date) {
+      const s = date.toISOString().split('T')[0];
+      setDob(s);
+      if (s === new Date().toISOString().split('T')[0]) {
         Alert.alert('🎉 Happy Birthday!', 'We noticed it’s your birthday today!');
       }
     }
   };
 
-  const handleEmailSignUp = async () => {
+  const handleSignUp = async () => {
+    // basic fields
     if (!firstName || !lastName || !username || !email || !password || !dob || !gender) {
-      Alert.alert('Missing Fields', 'Please fill in all required fields.');
-      return;
+      return Alert.alert('Missing fields', 'Please complete all required fields.');
     }
-    if (accountType === 'organizer' && !address) {
-      Alert.alert('Missing Address', 'Please provide your address as an organizer.');
-      return;
+    if (accountType==='organizer') {
+      if (!phone||!street||!city||!stateCode||!zip) {
+        return Alert.alert('Organizer info', 'Phone and full address are required.');
+      }
     }
-    if (!acceptedTos) {
-      Alert.alert('Terms Required', 'Please accept the Terms of Service.');
-      return;
+    if (!accepted) {
+      return Alert.alert('Terms', 'You must accept the Terms of Service.');
     }
+
+    const payload: any = {
+      firstName, lastName, username, email, password, dob, gender,
+      accountType, phone,
+      ...(accountType==='organizer' && {
+        address: { street, unit, city, state: stateCode, zip }
+      })
+    };
 
     try {
-      const requestBody = {
-        firstName,
-        lastName,
-        username,
-        email,
-        password,
-        dob,
-        gender,
-        accountType,
-        ...(accountType === 'organizer' && { address }),
-      };
-
-      console.log('🚀 Submitting sign-up:', requestBody);
-
-      const response = await fetch('http://100.110.138.201:5050/api/auth/organizer/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-
-      const text = await response.text();
-      console.log('🔍 Response Text:', text);
-
-      let data;
-      try {
-        data = text ? JSON.parse(text) : {};
-      } catch (err) {
-        console.error('❌ JSON parse error:', err);
-        Alert.alert('Server error', 'Unexpected server response.');
-        return;
-      }
-
-      if (response.ok) {
-        Alert.alert('Sign Up Successful!', 'You can now log in.');
+      const res = await fetch(
+        'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/auth/signup',
+        { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        Alert.alert('Verify your email', 'A link was sent — you can log in but cannot create events until verified.');
         navigation.navigate('OrganizerLogin');
       } else {
-        Alert.alert('Sign Up Failed', data.error || 'An unexpected error occurred.');
+        Alert.alert('Sign Up Failed', data.error || 'Unexpected error');
       }
-    } catch (error) {
-      console.error('❌ Signup error:', error);
-      if (error instanceof Error) {
-        Alert.alert('Server error', error.message);
-      } else {
-        Alert.alert('Server error', 'An unexpected error occurred.');
-      }
+    } catch(err) {
+      console.error(err);
+      Alert.alert('Server error', 'Please try again later.');
     }
   };
 
-  const backgroundColor = theme === 'dark' ? '#1c1c1e' : '#f9f9f9';
-  const cardColor = theme === 'dark' ? '#2c2c2e' : '#ffffff';
-  const textColor = theme === 'dark' ? '#fff' : '#000';
-  const accentColor = '#a259ff';
+  const styles = StyleSheet.create({
+    container: { flex:1, backgroundColor: theme==='dark'?'#121212':'#f9f9f9' },
+    scroll:    { padding:20, flexGrow:1, justifyContent:'center' },
+    card:      { backgroundColor: theme==='dark'?'#1e1e1e':'#fff', borderRadius:16, padding:20, shadowColor:'#000', shadowOffset:{width:0,height:4},shadowOpacity:0.3,shadowRadius:8,elevation:5 },
+    title:     { fontSize:24,fontWeight:'bold',color:accent,textAlign:'center',marginBottom:20 },
+    input:     { borderBottomWidth:1,borderBottomColor:'#555',paddingVertical:8,marginBottom:16,color:theme==='dark'?'#fff':'#000' },
+    row:       { flexDirection:'row',alignItems:'center',marginBottom:16 },
+    radioBtn:  { width:20,height:20,borderRadius:10,borderWidth:2,marginRight:8,justifyContent:'center',alignItems:'center' },
+    radioDot:  { width:10,height:10,borderRadius:5,backgroundColor:accent },
+    flexRow:   { flexDirection:'row',justifyContent:'space-between' },
+    half:      { width:'48%' },
+    button:    { backgroundColor:accent,padding:14, borderRadius:8,alignItems:'center',marginTop:10 },
+    btnText:   { color:'#fff',fontSize:16 },
+    linkText:  { color:accent,textAlign:'right',marginVertical:8 },
+    smallText: { fontSize:12,color:'#888',marginBottom:8 },
+  });
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={styles.container}
+      behavior={Platform.OS==='ios'?'padding':undefined}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={[styles.card, { backgroundColor: cardColor, shadowColor: accentColor }]}>
-          <Text style={[styles.title, { color: accentColor }]}>Sign Up</Text>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.card}>
+          <Text style={styles.title}>Sign Up Here</Text>
 
-          {/* Account Type Toggle */}
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: textColor }}>
-              Account Type
-            </Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  accountType === 'user' && styles.selectedOption,
-                ]}
-                onPress={() => setAccountType('user')}
-              >
-                <Text style={{ color: accountType === 'user' ? '#fff' : textColor }}>User</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  accountType === 'organizer' && styles.selectedOption,
-                ]}
-                onPress={() => setAccountType('organizer')}
-              >
-                <Text style={{ color: accountType === 'organizer' ? '#fff' : textColor }}>Organizer</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-              You can update this later in your profile settings.
-            </Text>
-          </View>
-
+          {/* Name, Username, Email */}
           <TextInput
-            placeholder="First Name"
-            placeholderTextColor="#aaa"
-            style={[styles.input, { color: textColor }]}
-            value={firstName}
-            onChangeText={setFirstName}
+            placeholder="First Name" style={styles.input}
+            value={firstName} onChangeText={setFirstName}
           />
           <TextInput
-            placeholder="Last Name"
-            placeholderTextColor="#aaa"
-            style={[styles.input, { color: textColor }]}
-            value={lastName}
-            onChangeText={setLastName}
+            placeholder="Last Name" style={styles.input}
+            value={lastName} onChangeText={setLastName}
           />
           <TextInput
-            placeholder="Username"
-            placeholderTextColor="#aaa"
-            style={[styles.input, { color: textColor }]}
-            value={username}
-            onChangeText={setUsername}
-          />
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor="#aaa"
-            style={[styles.input, { color: textColor }]}
-            value={email}
-            onChangeText={setEmail}
+            placeholder="Username" style={styles.input}
+            value={username} onChangeText={setUsername}
             autoCapitalize="none"
-            keyboardType="email-address"
+          />
+          <TextInput
+            placeholder="Email" style={styles.input}
+            value={email} onChangeText={setEmail}
+            keyboardType="email-address" autoCapitalize="none"
           />
 
-          {/* Address only for organizer */}
-          {accountType === 'organizer' && (
-            <TextInput
-              placeholder="Organizer Address"
-              placeholderTextColor="#aaa"
-              style={[styles.input, { color: textColor }]}
-              value={address}
-              onChangeText={setAddress}
-            />
-          )}
-
-          <View style={styles.passwordContainer}>
+          {/* Password */}
+          <View style={[styles.row, { borderBottomColor:'#555', borderBottomWidth:1, marginBottom:16 }]}>
             <TextInput
               placeholder="Password"
-              placeholderTextColor="#aaa"
-              style={[styles.input, styles.passwordInput, { color: textColor }]}
-              value={password}
-              onChangeText={setPassword}
+              style={{ flex:1, color: theme==='dark'?'#fff':'#000' }}
+              value={password} onChangeText={setPassword}
               secureTextEntry={!showPassword}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={24} color={textColor} />
+            <TouchableOpacity onPress={()=>setShowPassword(v=>!v)}>
+              <Ionicons name={showPassword?'eye-off':'eye'} size={20} color={theme==='dark'?'#fff':'#000'} />
             </TouchableOpacity>
           </View>
-
-          <View style={styles.passwordRequirements}>
-            <Text style={{ color: hasUppercase ? 'green' : 'red' }}>• At least one uppercase letter</Text>
-            <Text style={{ color: hasNumber ? 'green' : 'red' }}>• At least one number</Text>
-            <Text style={{ color: hasSpecialChar ? 'green' : 'red' }}>• At least one special character</Text>
-            <Text style={{ color: hasMinLength ? 'green' : 'red' }}>• Minimum 9 characters</Text>
+          {/* Password rules */}
+          <View style={{ marginBottom:16 }}>
+            <Text style={[styles.smallText,{color:hasUpper?'#0f0':'#f55'}]}>• Uppercase letter</Text>
+            <Text style={[styles.smallText,{color:hasNum?'#0f0':'#f55'}]}>• Number</Text>
+            <Text style={[styles.smallText,{color:hasSpec?'#0f0':'#f55'}]}>• Special character</Text>
+            <Text style={[styles.smallText,{color:hasLen?'#0f0':'#f55'}]}>• ≥ 9 characters</Text>
           </View>
 
-          <Pressable
-            onPress={() => setShowDatePicker(true)}
-            style={[
-              styles.input,
-              {
-                justifyContent: 'center',
-                backgroundColor: theme === 'dark' ? '#2c2c2e' : '#f0f0f0',
-                paddingHorizontal: 10,
-              },
-            ]}
+          {/* DOB */}
+          <TouchableOpacity
+            onPress={()=>setShowDobPicker(true)}
+            style={[styles.input,{ justifyContent:'center' }]}
           >
-            <Text style={{ color: dob ? textColor : '#aaa' }}>
-              {dob || 'Date of Birth (YYYY-MM-DD)'}
+            <Text style={{ color: dob? (theme==='dark'?'#fff':'#000') : '#888' }}>
+              {dob || 'Date of Birth'}
             </Text>
-          </Pressable>
-
-          {showDatePicker && (
+          </TouchableOpacity>
+          {showDobPicker && (
             <DateTimePicker
-              value={dob ? new Date(dob + 'T00:00:00') : new Date(2000, 0, 1)}
+              value={dob?new Date(dob+'T00:00:00'):new Date(2000,0,1)}
               mode="date"
-              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-              onChange={handleDateChange}
+              display={Platform.OS==='ios'?'spinner':'default'}
               maximumDate={new Date()}
+              onChange={onDobChange}
             />
           )}
 
-          <Picker
-            selectedValue={gender}
-            style={[styles.picker, { color: textColor }]}
-            onValueChange={(value) => setGender(value)}
-          >
-            <Picker.Item label="Select Gender" value="" />
-            <Picker.Item label="Male" value="male" />
-            <Picker.Item label="Female" value="female" />
-            <Picker.Item label="Other" value="other" />
-          </Picker>
+          {/* Gender */}
+          { !gender || showGenderPicker ? (
+            <Picker
+              selectedValue={gender}
+              style={{ marginBottom:16, color: theme==='dark'?'#fff':'#000' }}
+              onValueChange={(v)=>{ setGender(v); setShowGenderPicker(false); }}
+            >
+              <Picker.Item label="Select Gender" value="" />
+              <Picker.Item label="Male"   value="male" />
+              <Picker.Item label="Female" value="female" />
+              <Picker.Item label="Other"  value="other" />
+            </Picker>
+          ) : (
+            <TouchableOpacity onPress={()=>setShowGenderPicker(true)} style={[styles.input,{ justifyContent:'center' }]}>
+              <Text style={{ color: theme==='dark'?'#fff':'#000' }}>{gender}</Text>
+            </TouchableOpacity>
+          )}
 
-          <View style={styles.switchContainer}>
-            <Switch
-              value={acceptedTos}
-              onValueChange={setAcceptedTos}
-              trackColor={{ false: '#767577', true: accentColor }}
-              thumbColor={acceptedTos ? accentColor : '#f4f3f4'}
+          {/* Account type radio */}
+          <View style={[styles.row, { marginBottom:16 }]}>
+            {(['user','organizer'] as const).map(type => (
+              <View key={type} style={[styles.row, { marginRight:24 }]}>
+                <TouchableOpacity
+                  style={[styles.radioBtn, { borderColor: accountType===type?accent:'#888' }]}
+                  onPress={()=>setAccountType(type)}
+                >
+                  {accountType===type && <View style={styles.radioDot}/> }
+                </TouchableOpacity>
+                <Text style={{ color: theme==='dark'?'#fff':'#000' }}>{type.charAt(0).toUpperCase()+type.slice(1)}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Organizer-only */}
+          {accountType==='organizer' && <>
+            <TextInput
+              placeholder="Phone Number"
+              style={styles.input}
+              value={phone} onChangeText={setPhone}
+              keyboardType="phone-pad"
             />
-            <Text style={[styles.tosText, { color: textColor }]}>
-              I accept the Terms of Service
+            <Text style={styles.smallText}>Street Address</Text>
+            <TextInput
+              placeholder="123 Main St"
+              style={styles.input}
+              value={street} onChangeText={setStreet}
+            />
+            <View style={styles.flexRow}>
+              <View style={styles.half}>
+                <Text style={styles.smallText}>Apt/Unit #</Text>
+                <TextInput
+                  placeholder="Unit #"
+                  style={styles.input}
+                  value={unit} onChangeText={setUnit}
+                />
+              </View>
+              <View style={styles.half}>
+                <Text style={styles.smallText}>City</Text>
+                <TextInput
+                  placeholder="City"
+                  style={styles.input}
+                  value={city} onChangeText={setCity}
+                />
+              </View>
+            </View>
+            <View style={styles.flexRow}>
+              <View style={styles.half}>
+                <Text style={styles.smallText}>State</Text>
+                <TextInput
+                  placeholder="State"
+                  style={styles.input}
+                  value={stateCode} onChangeText={setStateCode}
+                />
+              </View>
+              <View style={styles.half}>
+                <Text style={styles.smallText}>ZIP Code</Text>
+                <TextInput
+                  placeholder="ZIP"
+                  style={styles.input}
+                  value={zip} onChangeText={setZip}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+          </>}
+
+          {/* Terms */}
+          <View style={[styles.row,{ marginVertical:16 }]}>
+            <Switch
+              value={accepted}
+              onValueChange={setAccepted}
+              trackColor={{ false:'#555', true:accent }}
+              thumbColor={accepted?'#fff':'#ccc'}
+            />
+            <Text style={{ marginLeft:8, color: theme==='dark'?'#fff':'#000' }}>
+              Accept Terms of Service
             </Text>
           </View>
 
+          {/* Submit */}
           <TouchableOpacity
-            style={[
-              styles.button,
-              {
-                backgroundColor: acceptedTos ? accentColor : '#aaa',
-              },
-            ]}
-            onPress={handleEmailSignUp}
-            disabled={!acceptedTos}
+            style={[styles.button, { opacity: accepted?1:0.6 }]}
+            onPress={handleSignUp}
+            disabled={!accepted}
           >
-            <Text style={styles.buttonText}>Sign Up</Text>
+            <Text style={styles.btnText}>Create Account</Text>
           </TouchableOpacity>
 
-          {message && <Text style={[styles.message, { color: textColor }]}>{message}</Text>}
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContainer: { flexGrow: 1, justifyContent: 'center', padding: 20 },
-  card: {
-    borderRadius: 16,
-    padding: 20,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  title: { fontSize: 24, fontWeight: 'bold', alignSelf: 'center', marginBottom: 20 },
-  input: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    paddingVertical: 10,
-    marginBottom: 16,
-    fontSize: 16,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    marginBottom: 8,
-  },
-  passwordInput: { flex: 1, paddingVertical: 10 },
-  passwordRequirements: { marginBottom: 16 },
-  picker: { marginBottom: 16 },
-  switchContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  tosText: { marginLeft: 8, fontSize: 14 },
-  button: { borderRadius: 8, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  message: { textAlign: 'center', marginTop: 10 },
-  optionButton: {
-    flex: 1,
-    padding: 12,
-    marginHorizontal: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#aaa',
-    alignItems: 'center',
-  },
-  selectedOption: {
-    backgroundColor: '#a259ff',
-    borderColor: '#a259ff',
-  },
-});
 
 export default OrganizerSignUpScreen;

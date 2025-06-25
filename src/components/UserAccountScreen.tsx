@@ -14,7 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App'; 
 
-const API_URL = 'https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api';
+const API_URL = 'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api';
 
 const UserAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -45,6 +45,7 @@ const UserAccountScreen: React.FC = () => {
         const data = await res.json();
         setUser(data.user);
         setProfileImage(data.user.profileImage);
+        await AsyncStorage.setItem('userProfileImage', data.user.profileImage);
         if (data.user.location) setLocation(data.user.location);
 
         // ✅ This is now correctly placed AFTER the user is set

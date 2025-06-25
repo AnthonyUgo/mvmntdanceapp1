@@ -16,6 +16,7 @@ import UserTabNavigator from './src/components/UserTabNavigator'; // ✅ NEW: Ta
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
 import 'react-native-get-random-values';
 import ForgotPasswordScreen from './src/components/ForgotPasswordScreen';
+import WebviewScreen from './src/components/WebviewScreen';
 
 // 1️⃣ Define your stack param list
 export type RootStackParamList = {
@@ -104,6 +105,11 @@ export default function App() {
                 component={ManageEventScreen}
                 options={{ headerShown: true, title: 'Manage Event' }}
               />
+              <Stack.Screen
+                name="WebviewScreen"
+                component={WebviewScreen}    // you’ll need to create this
+                options={{ title: 'Map' }}
+/>
               <Stack.Screen
                 name="ForgotPassword"
                 component={ForgotPasswordScreen}

@@ -49,7 +49,7 @@ const OrganizerLoginScreen: React.FC = () => {
   }
 
   try {
-    const response = await fetch('https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/auth/login', {
+    const response = await fetch('https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),

@@ -1,283 +1,361 @@
+// CreateEventScreen.tsx
 import React, { useContext, useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
+  ScrollView,
   TouchableOpacity,
+  TextInput,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
   Keyboard,
   Alert,
   Image,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback
+  Switch,
 } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
 import { launchImageLibraryAsync, MediaTypeOptions } from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import DateTimePicker from '@react-native-community/datetimepicker';
+
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
 
 const CreateEventScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const backgroundColor = theme === 'dark' ? '#121212' : '#fff';
-  const textColor = theme === 'dark' ? '#fff' : '#000';
-  const accentColor = '#4285F4';
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const bg = theme === 'dark' ? '#121212' : '#fff';
+  const txt = theme === 'dark' ? '#fff' : '#000';
+  const accent = '#4285F4';
 
+  // Core state
+  const [imageUri, setImageUri] = useState<string|null>(null);
   const [eventName, setEventName] = useState('');
   const [venueName, setVenueName] = useState('');
-  const [venueAddress, setVenueAddress] = useState('');
-  const [eventDate, setEventDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [startDateTime, setStartDateTime] = useState(new Date());
-  const [endDateTime, setEndDateTime] = useState(new Date());
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [ticketPrice, setTicketPrice] = useState('');
-  const [ticketQuantity, setTicketQuantity] = useState(1);
-  const [collaboratorEmail, setCollaboratorEmail] = useState('');
-  const [eventImage, setEventImage] = useState<string | null>(null);
+  const [unit, setUnit] = useState('');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [stateCode, setStateCode] = useState('');
+  const [zip, setZip] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [showDate, setShowDate] = useState(false);
+  const [start, setStart] = useState(new Date());
+  const [showStart, setShowStart] = useState(false);
+  const [end, setEnd] = useState(new Date());
+  const [showEnd, setShowEnd] = useState(false);
+  const [price, setPrice] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [collab, setCollab] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
 
+  // pick image
   const pickImage = async () => {
-    const result = await launchImageLibraryAsync({
+    const res = await launchImageLibraryAsync({
       mediaTypes: MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 0.7,
+      quality: 0.7
     });
-    if (!result.canceled && result.assets.length > 0) {
-      setEventImage(result.assets[0].uri);
+    if (!res.canceled && res.assets.length) {
+      setImageUri(res.assets[0].uri);
     }
   };
 
-  const handleSave = async (isDraft: boolean) => {
-    if (!eventName || !venueName || !venueAddress) {
-      Alert.alert('Missing Fields', 'Please fill in all required fields.');
-      return;
+  // Save
+  const handleSave = async (draft: boolean) => {
+    if (!eventName || !venueName || !street || !city || !stateCode || !zip) {
+      return Alert.alert('Missing Fields','Please complete all required fields.');
+    }
+    const organizerId = await AsyncStorage.getItem('organizerUsername');
+    if (!organizerId) {
+      return Alert.alert('Not signed in','Please log in as an organizer.');
     }
 
-    const event = {
+    const payload = {
       id: Date.now().toString(),
       title: eventName,
-      date: eventDate.toISOString().split('T')[0],
-      venue: {
-        name: venueName,
-        address: venueAddress,
-      },
-       startTime: startDateTime.toLocaleTimeString('en-GB', {
-   hour: '2-digit', minute: '2-digit', hour12: false
- }),
- endTime:   endDateTime.toLocaleTimeString('en-GB', {
-   hour: '2-digit', minute: '2-digit', hour12: false
- }),
-      ticketPrice,
-      quantity: ticketQuantity,
-      image: eventImage,
-      collaborator: collaboratorEmail,
-      draft: isDraft
+      date: date.toISOString().slice(0,10),
+      startTime: start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      endTime:   end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      venueName,
+      venueAddress: `${street}${unit?`, Apt ${unit}`:''}, ${city}, ${stateCode} ${zip}`,
+      venueCity: city,
+      venueState: stateCode,
+      venueZip: zip,
+      price,
+      quantity,
+      collaborator: collab,
+      image: imageUri,
+      draft,
+      visibility: isPrivate ? 'private':'public',
+      shareCode: isPrivate ? Math.random().toString(36).substr(2,8):null,
+      tickets: [],
+      organizerId
     };
 
     try {
-  const organizerId = await AsyncStorage.getItem('organizerUsername'); // or 'organizerId' if that's your key
-  if (!organizerId) {
-    Alert.alert('Error', 'Organizer not logged in.');
-    return;
-  }
-
-  const payload = {
-    id: Date.now().toString(),
-    title: eventName,
-    date: eventDate.toISOString().split('T')[0],
-    startTime: startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    endTime: endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    venueName,
-    venueAddress,
-    price: ticketPrice,
-    quantity: ticketQuantity,
-    collaborator: collaboratorEmail,
-    image: eventImage,
-    draft: isDraft,
-    tickets: [],
-    organizerId // required for partition key
+      const res = await fetch(
+        'https://your-ngrok-url/api/events',
+        {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        }
+      );
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error||res.statusText);
+      }
+      Alert.alert('Success', draft?'Saved as draft':'Published!');
+      nav.navigate('MyEvents',{ initialTab: draft?'drafts':'live' });
+    } catch(e:any) {
+      console.warn(e);
+      Alert.alert('Error', e.message);
+    }
   };
 
-  const response = await fetch('https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/events', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (response.ok) {
-    Alert.alert('Success', `Event ${isDraft ? 'saved as draft' : 'published'} successfully.`);
-    navigation.navigate('MyEvents', {
-      initialTab: isDraft ? 'drafts' : 'live'
-    });
-  } else {
-    const { error } = await response.json();
-    Alert.alert('Error', error || 'Something went wrong while saving.');
-  }
-} catch (err) {
-  console.error('❌ Save Error:', err);
-  Alert.alert('Error', 'Something went wrong while saving.');
-}
-
-  };
+  // Extract address components helper
+  const extract = (components:any[], type:string) =>
+    components.find(c=>c.types.includes(type))?.long_name||'';
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS==='ios'?'padding':undefined}
+      style={{flex:1,backgroundColor:bg}}
+    >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={[styles.container, { backgroundColor }]}> 
-          <Text style={[styles.title, { color: textColor }]}>Create Event</Text>
+      <ScrollView contentContainerStyle={s.container}>
+        <Text style={[s.header,{color:txt}]}>Create Event</Text>
 
-          <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-            {eventImage ? (
-              <Image source={{ uri: eventImage }} style={styles.eventImage} />
-            ) : (
-              <View style={styles.placeholder}>
-                <Ionicons name="camera-outline" size={40} color={accentColor} />
-                <Text style={{ color: accentColor }}>Add Event Image</Text>
+        {/* Image */}
+        <TouchableOpacity onPress={pickImage} style={s.imagePicker}>
+          {imageUri
+            ? <Image source={{uri:imageUri}} style={s.image} />
+            : <View style={s.placeholder}>
+                <Ionicons name="camera-outline" size={40} color={accent}/>
+                <Text style={{color:accent}}>Add Event Image</Text>
               </View>
-            )}
-          </TouchableOpacity>
+          }
+        </TouchableOpacity>
 
-          <TextInput style={[styles.input, { color: textColor, borderColor: accentColor }]} placeholder="Event Name" placeholderTextColor="#888" value={eventName} onChangeText={setEventName} />
+        {/* Event Name */}
+        <TextInput
+          style={[s.input,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+          placeholder="Event Name"
+          placeholderTextColor="#888"
+          value={eventName}
+          onChangeText={setEventName}
+        />
 
-          {/* Date Picker */}
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={[styles.input, { justifyContent: 'center' }]}>
-            <Text style={{ color: textColor }}>{eventDate.toDateString()} (Tap to Change Date)</Text>
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              value={eventDate}
-              mode="date"
-              display="default"
-              onChange={(event, selectedDate) => {
-                setShowDatePicker(false);
-                if (selectedDate) setEventDate(selectedDate);
-              }}
-            />
-          )}
+        {/* Google Places for Venue */}
+        <GooglePlacesAutocomplete
+          placeholder="Search venue"
+          fetchDetails
+          query={{ key: GOOGLE_PLACES_API_KEY, language:'en', types:'establishment' }}
+          onPress={(data, details) => {
+            setVenueName(data.description);
+            const comps = details?.address_components||[];
+            setStreet(extract(comps,'street_number')+' '+extract(comps,'route'));
+            setCity(extract(comps,'locality'));
+            setStateCode(extract(comps,'administrative_area_level_1'));
+            setZip(extract(comps,'postal_code'));
+          }}
+          styles={{
+            textInput:{...s.input, paddingLeft:20, paddingRight:50, backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5', color:txt},
+            container:{flex:0,marginBottom:16},
+            listView:{backgroundColor:theme==='dark'?'#333':'#fff'}
+          }}
+        />
 
-          {/* Start Time Picker */}
-          <TouchableOpacity onPress={() => setShowStartPicker(true)} style={[styles.input, { justifyContent: 'center' }]}>
-            <Text style={{ color: textColor }}>
-              {startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Tap to Set Start Time)
-            </Text>
-          </TouchableOpacity>
-          {showStartPicker && (
-            <DateTimePicker
-              value={startDateTime}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={(event, selectedTime) => {
-                setShowStartPicker(false);
-                if (selectedTime) setStartDateTime(selectedTime);
-              }}
-            />
-          )}
-
-          {/* End Time Picker */}
-          <TouchableOpacity onPress={() => setShowEndPicker(true)} style={[styles.input, { justifyContent: 'center' }]}>
-            <Text style={{ color: textColor }}>
-              {endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (Tap to Set End Time)
-            </Text>
-          </TouchableOpacity>
-          {showEndPicker && (
-            <DateTimePicker
-              value={endDateTime}
-              mode="time"
-              is24Hour={false}
-              display="default"
-              onChange={(event, selectedTime) => {
-                setShowEndPicker(false);
-                if (selectedTime) setEndDateTime(selectedTime);
-              }}
-            />
-          )}
-
-          <TextInput style={[styles.input, { color: textColor, borderColor: accentColor }]} placeholder="Venue Name" placeholderTextColor="#888" value={venueName} onChangeText={setVenueName} />
-          <TextInput style={[styles.input, { color: textColor, borderColor: accentColor }]} placeholder="Venue Address" placeholderTextColor="#888" value={venueAddress} onChangeText={setVenueAddress} />
-
+        {/* Address fields */}
+        <View style={s.row}>
           <TextInput
-            style={[styles.input, { color: textColor, borderColor: accentColor }]} 
-            placeholder="Ticket Price (optional)"
+            style={[s.input,s.half,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+            placeholder="Street"
             placeholderTextColor="#888"
-            value={ticketPrice}
-            onChangeText={(text) => {
-              const cleaned = text.replace(/[^0-9.]/g, '');
-              const parts = cleaned.split('.');
-              let formatted = parts[0];
-              if (parts.length > 1) formatted += '.' + parts[1].slice(0, 2);
-              setTicketPrice(formatted);
-            }}
+            value={street}
+            onChangeText={setStreet}
+          />
+          <TextInput
+            style={[s.input,s.half,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+            placeholder="Apt/Unit (opt.)"
+            placeholderTextColor="#888"
+            value={unit}
+            onChangeText={setUnit}
+          />
+        </View>
+        <View style={s.row}>
+          <TextInput
+            style={[s.input,s.half,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+            placeholder="City"
+            placeholderTextColor="#888"
+            value={city}
+            onChangeText={setCity}
+          />
+          <TextInput
+            style={[s.input,s.half,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+            placeholder="State"
+            placeholderTextColor="#888"
+            value={stateCode}
+            onChangeText={setStateCode}
+          />
+        </View>
+        <TextInput
+          style={[s.input,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+          placeholder="ZIP Code"
+          placeholderTextColor="#888"
+          value={zip}
+          keyboardType="numeric"
+          onChangeText={setZip}
+        />
+
+        {/* Date & Time */}
+        <View style={s.row}>
+          <TouchableOpacity
+            style={[s.input,s.half,{justifyContent:'center'}]}
+            onPress={()=>setShowDate(true)}
+          >
+            <Text style={{color:txt}}>
+              {date.toDateString()}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.input,s.half,{justifyContent:'center'}]}
+            onPress={()=>setShowStart(true)}
+          >
+            <Text style={{color:txt}}>
+              {start.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        { showDate  && <DateTimePicker
+            value={date} mode="date" display="default"
+            onChange={(_,d)=>{ setShowDate(false); if(d) setDate(d); }}
+          /> }
+        { showStart && <DateTimePicker
+            value={start} mode="time" display="default"
+            onChange={(_,t)=>{ setShowStart(false); if(t) setStart(t); }}
+          /> }
+
+        <TouchableOpacity
+          style={[s.input,{justifyContent:'center'}]}
+          onPress={()=>setShowEnd(true)}
+        >
+          <Text style={{color:txt}}>
+            End: {end.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+          </Text>
+        </TouchableOpacity>
+        { showEnd && <DateTimePicker
+            value={end} mode="time" display="default"
+            onChange={(_,t)=>{ setShowEnd(false); if(t) setEnd(t); }}
+          /> }
+
+        {/* Price & Qty */}
+        <View style={s.row}>
+          <TextInput
+            style={[s.input,s.half,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+            placeholder="Price (0.00)"
+            placeholderTextColor="#888"
             keyboardType="decimal-pad"
+            value={price}
+            onChangeText={setPrice}
           />
-
-          <View style={[styles.quantityContainer, { borderColor: accentColor }]}> 
-            <Ionicons name="remove-circle-outline" size={28} color={accentColor} onPress={() => ticketQuantity > 1 && setTicketQuantity(ticketQuantity - 1)} />
-            <Text style={[styles.quantityText, { color: textColor }]}>{ticketQuantity}</Text>
-            <Ionicons name="add-circle-outline" size={28} color={accentColor} onPress={() => setTicketQuantity(ticketQuantity + 1)} />
+          <View style={[s.qtyContainer,{borderColor:accent}]}>
+            <Ionicons
+              name="remove-circle-outline" size={28} color={accent}
+              onPress={()=>quantity>1 && setQuantity(q=>q-1)}
+            />
+            <Text style={{fontSize:18,color:txt}}>{quantity}</Text>
+            <Ionicons
+              name="add-circle-outline" size={28} color={accent}
+              onPress={()=>setQuantity(q=>q+1)}
+            />
           </View>
+        </View>
 
-          <TextInput
-            style={[styles.input, { color: textColor, borderColor: accentColor }]} 
-            placeholder="Invite Collaborator Email (optional)"
-            placeholderTextColor="#888"
-            value={collaboratorEmail}
-            onChangeText={setCollaboratorEmail}
-            keyboardType="email-address"
+        {/* Collaborator */}
+        <TextInput
+          style={[s.input,{backgroundColor:theme==='dark'?'#1e1e1e':'#f5f5f5',color:txt}]}
+          placeholder="Collaborator username or email"
+          placeholderTextColor="#888"
+          value={collab}
+          onChangeText={setCollab}
+        />
+
+        {/* Private toggle */}
+        <View style={s.row}>
+          <Switch
+            value={isPrivate}
+            onValueChange={setIsPrivate}
+            trackColor={{false:'#ccc',true:accent}}
+            thumbColor="#fff"
           />
+          <Text style={{marginLeft:8,color:txt}}>Private event</Text>
+        </View>
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={[styles.draftButton, { borderColor: accentColor }]} onPress={() => handleSave(true)}>
-              <Ionicons name="save-outline" size={20} color={accentColor} />
-              <Text style={[styles.draftText, { color: accentColor }]}>Save Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.publishButton, { backgroundColor: accentColor }]} onPress={() => handleSave(false)}>
-              <Ionicons name="checkmark-outline" size={20} color="#fff" />
-              <Text style={styles.publishText}>Publish</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        {/* Buttons */}
+        <View style={s.row}>
+          <TouchableOpacity
+            style={[s.btnOutline,{borderColor:accent}]}
+            onPress={()=>handleSave(true)}
+          >
+            <Ionicons name="save-outline" size={20} color={accent} />
+            <Text style={[s.btnText,{color:accent}]}> Save Draft</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.btnFill,{backgroundColor:accent}]}
+            onPress={()=>handleSave(false)}
+          >
+            <Ionicons name="checkmark-outline" size={20} color="#fff" />
+            <Text style={s.btnText}> Publish</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  imagePicker: {
-    height: 180, borderWidth: 1, borderRadius: 8, marginBottom: 16,
-    overflow: 'hidden', justifyContent: 'center', alignItems: 'center'
+const s = StyleSheet.create({
+  container:    { padding:20, paddingBottom:40 },
+  header:       { fontSize:24, fontWeight:'bold', marginBottom:20 },
+  imagePicker:  {
+    height:180, borderWidth:1, borderRadius:12,
+    marginBottom:16, overflow:'hidden',
+    justifyContent:'center',alignItems:'center'
   },
-  eventImage: { width: '100%', height: '100%' },
-  placeholder: { alignItems: 'center' },
-  input: {
-    borderWidth: 1, borderRadius: 8, paddingHorizontal: 16,
-    paddingVertical: 12, marginBottom: 16, fontSize: 16
+  image:        { width:'100%',height:'100%' },
+  placeholder:  { alignItems:'center' },
+  input:        {
+    flex:0, width:'100%',
+    borderRadius:12, padding:12,
+    marginBottom:16, fontSize:16
   },
-  quantityContainer: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 20
+  row:          { flexDirection:'row',justifyContent:'space-between' },
+  half:         { width:'48%' },
+  qtyContainer: {
+    flexDirection:'row',alignItems:'center',
+    justifyContent:'space-between',
+    borderWidth:1,borderRadius:12,
+    paddingHorizontal:12,paddingVertical:8,
+    width:'48%'
   },
-  quantityText: { fontSize: 18, fontWeight: '600' },
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  draftButton: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8,
-    padding: 12, flex: 1, marginRight: 8
+  btnFill:      {
+    flex:1,flexDirection:'row',alignItems:'center',
+    justifyContent:'center',padding:14,
+    borderRadius:12,marginLeft:8
   },
-  draftText: { marginLeft: 8, fontSize: 16 },
-  publishButton: {
-    flexDirection: 'row', alignItems: 'center', borderRadius: 8,
-    padding: 12, flex: 1, marginLeft: 8
+  btnOutline:   {
+    flex:1,flexDirection:'row',alignItems:'center',
+    justifyContent:'center',padding:14,
+    borderRadius:12,marginRight:8, borderWidth:1
   },
-  publishText: { color: '#fff', fontSize: 16, marginLeft: 8 }
+  btnText:      { color:'#fff',fontSize:16,marginLeft:6 }
 });
 
 export default CreateEventScreen;

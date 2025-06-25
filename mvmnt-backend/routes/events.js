@@ -1,30 +1,89 @@
 // routes/events.js
 const express = require('express');
+const multer = require('multer');
+const { BlobServiceClient } = require('@azure/storage-blob');
+const { v4: uuidv4 } = require('uuid');
 const { eventsContainer } = require('../db');
 
 const router = express.Router();
+const upload = multer(); // ← this defines `upload.single('image')`
 
-// CREATE or UPDATE EVENT
+// ───────────────
+// 1) UPLOAD EVENT IMAGE
+// POST /api/events/upload-image
+router.post(
+  '/upload-image',
+  upload.single('image'),
+  async (req, res) => {
+    const { eventId } = req.body;
+    if (!eventId || !req.file) {
+      return res.status(400).json({ error: 'Missing eventId or image file.' });
+    }
+
+    try {
+      // use your existing storage container name
+      const containerClient = BlobServiceClient
+        .fromConnectionString(process.env.AZURE_STORAGE_CONNECTION_STRING)
+        .getContainerClient(process.env.AZURE_STORAGE_CONTAINER_NAME);
+
+      // prefix under "event-images/"
+      const blobName = `event-images/${eventId}-${uuidv4()}.jpg`;
+      const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+      // upload buffer
+      await blockBlobClient.uploadData(req.file.buffer, {
+        blobHTTPHeaders: { blobContentType: req.file.mimetype }
+      });
+
+      res.json({ imageUrl: blockBlobClient.url });
+    } catch (err) {
+      console.error('❌ Event image upload error:', err);
+      res.status(500).json({ error: 'Server error.' });
+    }
+  }
+);
+
+// ───────────────
+// 2) CREATE or UPDATE EVENT
+// POST /api/events
 router.post('/', async (req, res) => {
   const {
     id, title, date, startTime, endTime,
     venueName, venueAddress, price, quantity,
     collaborator, image, draft = false,
-    tickets = [], organizerId
+    tickets = [], visibility, shareCode, organizerId
   } = req.body;
 
-  if (!organizerId || !id || !title || !date || !startTime || !endTime || !venueName || !venueAddress) {
+  if (
+    !organizerId ||
+    !id || !title || !date || !startTime || !endTime ||
+    !venueName || !venueAddress
+  ) {
     return res.status(400).json({ error: 'Missing required event fields.' });
   }
 
   const eventData = {
-    id, title, date, startTime, endTime,
-    venueName, venueAddress, price, quantity,
-    collaborator, image, draft, tickets, organizerId
+    id,
+    title,
+    date,
+    startTime,
+    endTime,
+    venueName,
+    venueAddress,
+    price,
+    quantity,
+    collaborator,
+    image,
+    draft,
+    visibility,   // "public" or "private"
+    shareCode,    // null or code
+    tickets,
+    organizerId
   };
 
   try {
-    const { resource } = await eventsContainer.items.upsert(eventData, { partitionKey: organizerId });
+    const { resource } = await eventsContainer
+      .items.upsert(eventData, { partitionKey: organizerId });
     res.json({ message: 'Event saved.', event: resource });
   } catch (err) {
     console.error('❌ Event save error:', err);
@@ -32,7 +91,9 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE EVENT
+// ───────────────
+// 3) DELETE EVENT
+// DELETE /api/events/:id?organizerId=...
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   const { organizerId } = req.query;
@@ -48,7 +109,9 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// GET ALL (by organizer)
+// ───────────────
+// 4) GET ALL FOR AN ORGANIZER
+// GET /api/events?organizerId=...&draft=true|false
 router.get('/', async (req, res) => {
   const { organizerId, draft } = req.query;
   if (!organizerId) return res.status(400).json({ error: 'organizerId required.' });
@@ -61,7 +124,9 @@ router.get('/', async (req, res) => {
   }
 
   try {
-    const { resources } = await eventsContainer.items.query({ query, parameters: params }).fetchAll();
+    const { resources } = await eventsContainer
+      .items.query({ query, parameters: params })
+      .fetchAll();
     res.json(resources);
   } catch (err) {
     console.error('❌ Fetch events error:', err);
@@ -69,7 +134,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET SINGLE
+// ───────────────
+// 5) GET SINGLE EVENT
+// GET /api/events/:id?organizerId=...
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const { organizerId } = req.query;
@@ -85,11 +152,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// PUBLIC EVENTS
+// ───────────────
+// 6) PUBLIC EVENTS
+// GET /api/events/public
 router.get('/public', async (_req, res) => {
   try {
-    const { resources } = await eventsContainer.items
-      .query({ query: 'SELECT * FROM c WHERE c.draft = false' })
+    const { resources } = await eventsContainer
+      .items.query({ query: 'SELECT * FROM c WHERE c.draft = false' })
       .fetchAll();
     res.json({ events: resources });
   } catch (err) {
@@ -98,7 +167,9 @@ router.get('/public', async (_req, res) => {
   }
 });
 
-// SAVED EVENTS
+// ───────────────
+// 7) SAVED EVENTS
+// POST /api/events/saved
 router.post('/saved', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required.' });
@@ -107,7 +178,8 @@ router.post('/saved', async (req, res) => {
       .query({
         query: 'SELECT * FROM c WHERE ARRAY_CONTAINS(c.savedBy, @e)',
         parameters: [{ name: '@e', value: email }]
-      }).fetchAll();
+      })
+      .fetchAll();
     res.json({ events: resources });
   } catch (err) {
     console.error('❌ Fetch saved events error:', err);
@@ -115,7 +187,9 @@ router.post('/saved', async (req, res) => {
   }
 });
 
-// TICKETED EVENTS
+// ───────────────
+// 8) TICKETED EVENTS
+// POST /api/events/tickets
 router.post('/tickets', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required.' });
@@ -124,7 +198,8 @@ router.post('/tickets', async (req, res) => {
       .query({
         query: 'SELECT * FROM c WHERE EXISTS (SELECT VALUE t FROM t IN c.tickets WHERE t.email=@e)',
         parameters: [{ name: '@e', value: email }]
-      }).fetchAll();
+      })
+      .fetchAll();
     res.json({ events: resources });
   } catch (err) {
     console.error('❌ Fetch ticketed events error:', err);

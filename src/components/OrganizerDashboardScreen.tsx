@@ -17,7 +17,7 @@ type Ticket = {
 };
 
 const screenWidth = Dimensions.get('window').width;
-const API_URL = 'https://3888-2605-ad80-90-c057-d1a2-a756-d240-92fe.ngrok-free.app/api/events'; // 🔁 Update to your actual API
+const API_URL = 'https://a85e-2605-ad80-90-c057-7ddd-6861-9988-a3a6.ngrok-free.app/api/events'; // 🔁 Update to your actual API
 
 const OrganizerDashboardScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
