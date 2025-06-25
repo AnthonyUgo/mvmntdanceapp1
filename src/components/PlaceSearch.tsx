@@ -3,7 +3,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { 
   GOOGLE_API_KEY_IOS, 
-  GOOGLE_API_KEY_ANDROID 
+  GOOGLE_API_KEY_ANDROID, 
 } from '@env';
 import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 

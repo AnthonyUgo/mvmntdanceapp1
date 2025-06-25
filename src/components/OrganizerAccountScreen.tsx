@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { API_BASE_URL } from '@env';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../contexts/ThemedContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useIsFocused } from '@react-navigation/native';
 
-const API_URL = 'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api';
+
 const OrganizerAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const navigation = useNavigation();
@@ -42,7 +43,7 @@ const OrganizerAccountScreen: React.FC = () => {
         const email = await AsyncStorage.getItem('userEmail');
         if (email) {
            try {
-             const res = await fetch(`${API_URL}/users/get?email=${email}`);
+             const res = await fetch(`${API_BASE_URL}/api/users/get?email=${encodeURIComponent(email)}`);
              if (res.ok) {
                const { user } = await res.json();
                setFirstName(user.firstName);

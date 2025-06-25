@@ -1,5 +1,13 @@
+// OrganizerDashboardScreen.tsx
 import React, { useContext, useLayoutEffect, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator
+} from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
@@ -7,17 +15,15 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { getEventsForOrganizer } from '../api';
 
 type Ticket = {
   purchased: boolean;
-  purchaserId?: string;
   purchaserName?: string;
   purchaseDate?: string;
 };
 
 const screenWidth = Dimensions.get('window').width;
-const API_URL = 'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events'; // 🔁 Update to your actual API
 
 const OrganizerDashboardScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -46,45 +52,49 @@ const OrganizerDashboardScreen: React.FC = () => {
   }, [navigation, theme]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       try {
         const organizerId = await AsyncStorage.getItem('organizerUsername');
         if (!organizerId) return;
 
-        const res = await fetch(`${API_URL}?organizerId=${organizerId}&draft=false`);
-        const events = await res.json();
+        // ← Use centralized API client
+        const events = await getEventsForOrganizer(organizerId, false);
 
         const allPurchases: { purchaser: string; date: string }[] = [];
         const purchaseCounts: Record<string, number> = {};
 
         for (const event of events) {
           (event.tickets || []).forEach((ticket: Ticket) => {
-  if (ticket.purchased) {
-    const date = ticket.purchaseDate?.split('T')[0] || event.date;
-    allPurchases.push({ purchaser: ticket.purchaserName || 'User', date });
-
-    purchaseCounts[date] = (purchaseCounts[date] || 0) + 1;
-  }
-});
+            if (ticket.purchased) {
+              const date = ticket.purchaseDate?.split('T')[0] || event.date;
+              allPurchases.push({
+                purchaser: ticket.purchaserName || 'User',
+                date
+              });
+              purchaseCounts[date] = (purchaseCounts[date] || 0) + 1;
+            }
+          });
         }
 
-        // Sort and limit chart to last 5 days
         const sortedDates = Object.keys(purchaseCounts).sort().slice(-5);
-        setChartData(sortedDates.map(date => purchaseCounts[date]));
+        setChartData(sortedDates.map(d => purchaseCounts[d]));
         setPurchases(allPurchases.slice(-5).reverse());
       } catch (err) {
         console.error('❌ Failed to load dashboard data:', err);
       } finally {
         setLoading(false);
       }
-    };
-
-    fetchData();
+    })();
   }, []);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme === 'dark' ? '#121212' : '#fff' }]}>
-      {/* Analytics Section */}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: theme === 'dark' ? '#121212' : '#fff' }
+      ]}
+    >
+      {/* Analytics */}
       <View style={styles.analyticsSection}>
         <Text style={[styles.sectionTitle, { color: textColor }]}>Analytics</Text>
         {loading ? (
@@ -102,13 +112,17 @@ const OrganizerDashboardScreen: React.FC = () => {
               backgroundGradientFrom: bgColor,
               backgroundGradientTo: bgColor,
               decimalPlaces: 0,
-              color: (opacity = 1) => theme === 'dark'
-                ? `rgba(255,255,255,${opacity})`
-                : `rgba(66,133,244,${opacity})`,
-              labelColor: (opacity = 1) => theme === 'dark'
-                ? `rgba(255,255,255,${opacity})`
-                : `rgba(0,0,0,${opacity})`,
-              propsForBackgroundLines: { stroke: theme === 'dark' ? '#333' : '#ccc' },
+              color: opacity =>
+                theme === 'dark'
+                  ? `rgba(255,255,255,${opacity})`
+                  : `rgba(66,133,244,${opacity})`,
+              labelColor: opacity =>
+                theme === 'dark'
+                  ? `rgba(255,255,255,${opacity})`
+                  : `rgba(0,0,0,${opacity})`,
+              propsForBackgroundLines: {
+                stroke: theme === 'dark' ? '#333' : '#ccc'
+              },
             }}
             bezier
             style={styles.chart}
@@ -127,14 +141,18 @@ const OrganizerDashboardScreen: React.FC = () => {
 
       {/* Recent Purchases */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: textColor }]}>Recent Purchases</Text>
+        <Text style={[styles.sectionTitle, { color: textColor }]}>
+          Recent Purchases
+        </Text>
         {purchases.length === 0 ? (
-          <Text style={{ color: textColor, fontSize: 14 }}>No purchases yet.</Text>
+          <Text style={{ color: textColor, fontSize: 14 }}>
+            No purchases yet.
+          </Text>
         ) : (
-          purchases.map((item, index) => (
-            <View key={index} style={styles.ticketItem}>
+          purchases.map((item, idx) => (
+            <View key={idx} style={styles.ticketItem}>
               <Text style={[styles.ticketText, { color: textColor }]}>
-                {item.purchaser} - {item.date}
+                {item.purchaser} – {item.date}
               </Text>
             </View>
           ))
@@ -146,8 +164,14 @@ const OrganizerDashboardScreen: React.FC = () => {
         style={[styles.button, { backgroundColor: bgColor }]}
         onPress={() => navigation.navigate('MyEvents')}
       >
-        <Ionicons name="people-circle-outline" size={24} color={primaryColor} />
-        <Text style={[styles.buttonText, { color: textColor }]}>View Events</Text>
+        <Ionicons
+          name="people-circle-outline"
+          size={24}
+          color={primaryColor}
+        />
+        <Text style={[styles.buttonText, { color: textColor }]}>
+          View Events
+        </Text>
       </TouchableOpacity>
     </View>
   );

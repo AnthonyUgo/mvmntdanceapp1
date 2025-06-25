@@ -1,3 +1,4 @@
+// src/components/OrganizerLoginScreen.tsx
 import React, { useContext, useState } from 'react';
 import {
   View,
@@ -6,10 +7,10 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,62 +18,38 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
+import { login } from '../api/auth';  // ← centralized login call
 
 WebBrowser.maybeCompleteAuthSession();
 
-type OrganizerLoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'OrganizerLogin'
->;
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'OrganizerLogin'>;
 
 const OrganizerLoginScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const navigation = useNavigation<OrganizerLoginScreenNavigationProp>();
+  const navigation = useNavigation<NavProp>();
 
-  const [googleRequest, googleResponse, promptGoogleLogin] = Google.useIdTokenAuthRequest({
+  const [_, __, promptGoogleLogin] = Google.useIdTokenAuthRequest({
     clientId: '1074387332824-2j90gu9gldca4t19ddtg6k4ea27ecgev.apps.googleusercontent.com',
   });
 
-  const backgroundColor = theme === 'dark' ? '#121212' : '#fff';
-  const textColor = theme === 'dark' ? '#fff' : '#000';
-  const inputBackground = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
-  const accentColor = '#4285F4';
+  const bg = theme === 'dark' ? '#121212' : '#fff';
+  const fg = theme === 'dark' ? '#fff' : '#000';
+  const inputBg = theme === 'dark' ? '#1e1e1e' : '#f0f0f0';
+  const accent = '#4285F4';
 
   const handleEmailSignIn = async () => {
-  if (!email || !password) {
-    Alert.alert('Missing Fields', 'Please enter both email and password.');
-    return;
-  }
-
-  try {
-    const response = await fetch('https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const text = await response.text();
-    let data;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (err) {
-      Alert.alert('Server error.', 'Unexpected server response.');
-      return;
+    if (!email || !password) {
+      return Alert.alert('Missing Fields', 'Please enter both email and password.');
     }
-
-    if (response.ok) {
+    try {
+      const data = await login(email, password);
       const profile = data.profile || data.organizer;
-
-      if (!profile) {
-        Alert.alert('Login Failed', 'Profile not found in server response.');
-        return;
-      }
-
-      const basePairs: [string, string][] = [
+      if (!profile) throw new Error('Profile missing');
+      const pairs: [string, string][] = [
         ['userFirstName', profile.firstName || ''],
         ['userLastName', profile.lastName || ''],
         ['userUsername', profile.username || ''],
@@ -82,46 +59,31 @@ const OrganizerLoginScreen: React.FC = () => {
         ['userGender', profile.gender || ''],
         ['userRole', profile.role || ''],
       ];
-
       if (profile.role === 'organizer') {
-        basePairs.push(['organizerUsername', profile.username || '']);
+        pairs.push(['organizerUsername', profile.username]);
       }
-
-      await AsyncStorage.multiSet(basePairs);
-
-      Alert.alert('Login Successful!', 'Welcome back!');
-      setTimeout(() => {
-        if (profile.role === 'organizer') {
-          navigation.navigate('OrganizerDashboard' as never);
-        } else {
-          navigation.navigate('UserDashboard' as never);
-        }
-      }, 500);
-    } else {
-      Alert.alert('Login Failed', data.error || 'Unknown error.');
+      await AsyncStorage.multiSet(pairs);
+      Alert.alert('Success', 'Welcome back!');
+      navigation.navigate(profile.role === 'organizer' ? 'OrganizerDashboard' : 'UserDashboard');
+    } catch (err: any) {
+      Alert.alert('Login Failed', err.message || 'Please try again.');
     }
-  } catch (error) {
-    Alert.alert('Server error.', 'Please try again later.');
-  }
-}; // ✅ this was missing
-
-  const handleGoogleLogin = () => promptGoogleLogin();
-  const handleSignUpPress = () => navigation.navigate('OrganizerSignUp' as never);
+  };
 
   return (
     <KeyboardAvoidingView
+      style={[styles.flex, { backgroundColor: bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={{ flex: 1 }}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={[styles.container, { backgroundColor }]}>
-          <Text style={[styles.title, { color: textColor }]}>Login</Text>
-          <Text style={[styles.subtitle, { color: textColor }]}>
-            Welcome! Please sign in to view/manage events.
+        <View style={styles.container}>
+          <Text style={[styles.title, { color: fg }]}>Login</Text>
+          <Text style={[styles.subtitle, { color: fg }]}>
+            Sign in to manage your events
           </Text>
 
           <TextInput
-            style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
+            style={[styles.input, { backgroundColor: inputBg, color: fg }]}
             placeholder="Email"
             placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
             value={email}
@@ -130,7 +92,7 @@ const OrganizerLoginScreen: React.FC = () => {
             autoCapitalize="none"
           />
           <TextInput
-            style={[styles.input, { backgroundColor: inputBackground, color: textColor }]}
+            style={[styles.input, { backgroundColor: inputBg, color: fg }]}
             placeholder="Password"
             placeholderTextColor={theme === 'dark' ? '#888' : '#666'}
             value={password}
@@ -138,40 +100,38 @@ const OrganizerLoginScreen: React.FC = () => {
             secureTextEntry
           />
 
-          <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword' as never)}>
-            <Text style={{
-              color: accentColor,
-              textAlign: 'right',
-              marginTop: 4,
-              marginBottom: 8,
-              textDecorationLine: 'underline'
-            }}>
-              Forgot Password?
-            </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('ForgotPassword')}
+            style={styles.forgotLink}
+          >
+            <Text style={{ color: accent }}>Forgot Password?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.signInButton, { backgroundColor: accentColor }]}
+            style={[styles.button, { backgroundColor: accent }]}
             onPress={handleEmailSignIn}
           >
             <Ionicons name="log-in-outline" size={24} color="#fff" />
-            <Text style={[styles.signInButtonText, { color: '#fff' }]}>Sign In</Text>
+            <Text style={styles.buttonText}>Sign In</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.googleButton, { backgroundColor: inputBackground }]}
-            onPress={handleGoogleLogin}
-          >
-            <Ionicons name="logo-google" size={24} color={accentColor} />
-            <Text style={[styles.googleButtonText, { color: textColor }]}>
+              style={[styles.button, { backgroundColor: inputBg }]}
+              onPress={() => promptGoogleLogin()}
+           >
+            <Ionicons name="logo-google" size={24} color={accent} />
+            <Text style={[styles.buttonText, { color: fg }]}>
               Continue with Google
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={handleSignUpPress} style={styles.signUpContainer}>
-            <Text style={[styles.signUpText, { color: textColor }]}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('OrganizerSignUp')}
+            style={styles.signUpContainer}
+          >
+            <Text style={{ color: fg }}>
               First time?{' '}
-              <Text style={{ color: accentColor, textDecorationLine: 'underline' }}>
+              <Text style={{ color: accent, textDecorationLine: 'underline' }}>
                 Sign Up
               </Text>
             </Text>
@@ -182,60 +142,65 @@ const OrganizerLoginScreen: React.FC = () => {
   );
 };
 
-
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   container: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
+    padding: 24,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 24,
+    textAlign: 'center',
   },
   input: {
-    width: '80%',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
     fontSize: 16,
-    marginBottom: 12,
+    // subtle shadow
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 2,
   },
-  signInButton: {
+  forgotLink: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+  },
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 10,
+    width: '100%',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 6,
+    elevation: 3,
   },
-  signInButtonText: {
+  buttonText: {
+    color: '#fff',
     fontSize: 16,
     marginLeft: 8,
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 20,
-  },
-  googleButtonText: {
-    fontSize: 16,
-    marginLeft: 8,
+    fontWeight: '600',
   },
   signUpContainer: {
     marginTop: 20,
-  },
-  signUpText: {
-    fontSize: 14,
   },
 });
 
