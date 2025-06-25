@@ -1,0 +1,3 @@
+; .deployment
+[config]
+project = mvmnt-backend
