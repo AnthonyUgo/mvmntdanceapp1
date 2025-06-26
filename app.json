@@ -15,6 +15,7 @@
       "bundleIdentifier": "com.anthonyu.mvmntdanceapp"
     },
     "extra": {
+      "apiUrl": "https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api",
       "eas": {
         "projectId": "bab36109-82b7-4b92-8ef6-b4ffcaf36d02"
       }

@@ -4,20 +4,23 @@ import { ThemeContext } from '../contexts/ThemedContext';
 
 const SavedScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const textColor = theme === 'dark' ? '#fff' : '#000';
-  const bgColor = theme === 'dark' ? '#121212' : '#fff';
+  const isDark = theme === 'dark';
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
-      <Text style={[styles.header, { color: textColor }]}>Saved</Text>
-      <Text style={{ color: textColor }}>You haven’t saved any events yet.</Text>
+    <View style={[s.container, { backgroundColor: isDark?'#121212':'#fff' }]}>
+      <Text style={[s.header, { color: isDark?'#fff':'#000' }]}>
+        Saved
+      </Text>
+      <Text style={{ color: isDark?'#ccc':'#666' }}>
+        You haven’t saved any events yet.
+      </Text>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, alignItems: 'center', justifyContent: 'center' },
-  header: { fontSize: 22, fontWeight: 'bold', marginBottom: 12 },
+const s = StyleSheet.create({
+  container: { flex:1, alignItems:'center', justifyContent:'center' },
+  header:    { fontSize:22, fontWeight:'bold', marginBottom:8 }
 });
 
 export default SavedScreen;

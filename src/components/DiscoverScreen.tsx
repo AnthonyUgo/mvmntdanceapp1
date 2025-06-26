@@ -1,4 +1,4 @@
-// DiscoverScreen.tsx
+// src/components/DiscoverScreen.tsx
 import React, { useContext, useEffect, useState } from 'react';
 import {
   View,
@@ -26,10 +26,8 @@ type EventType = {
   image?: string | null;
   price?: string;
   quantity: number;
+  visibility?: string;
 };
-
-const PUBLIC_EVENTS_URL =
-  'https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events/public';
 
 const DiscoverScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
@@ -43,64 +41,63 @@ const DiscoverScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // ➊ Get user's city via reverse geocode
+  // get user city but do NOT gate the fetch on it
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return setUserCity('');
+      if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({});
       const [place] = await Location.reverseGeocodeAsync(loc.coords);
       setUserCity(place.city || '');
     })();
   }, []);
 
-  // ➋ Fetch & keep only upcoming events
+  // fetch once on mount and also on manual refresh or searchTerm change
   const fetchEvents = async () => {
+    setLoading(true);
     setRefreshing(true);
     try {
-      const res = await fetch(PUBLIC_EVENTS_URL);
-      if (!res.ok) {
-        console.warn('Failed to fetch public events:', res.status);
-        return;
-      }
+      const res = await fetch('https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events/public');
+      console.log('Discover fetch status:', res.status);
       const body = await res.json();
+      console.log('Discover response body:', body);
       const raw: EventType[] = Array.isArray(body.events) ? body.events : [];
-
       const now = Date.now();
-      const upcoming = raw.filter(e => {
-        const ts = new Date(`${e.date}T${e.startTime}`).getTime();
-        return ts >= now;
+      let filtered = raw
+        .filter(e => e.visibility === 'public')
+        .filter(e => {
+          // normalize non-breaking spaces
+          const cleanTime = e.startTime.replace(/\u202F/g, ' ');
+          const ts = Date.parse(`${e.date} ${cleanTime}`);
+          return !isNaN(ts) && ts >= now;
+        });
+
+      if (searchTerm.trim()) {
+        const q = searchTerm.toLowerCase();
+        filtered = filtered.filter(e =>
+          e.title.toLowerCase().includes(q) ||
+          e.venueName.toLowerCase().includes(q)
+        );
+      }
+
+      filtered.sort((a, b) => {
+        const ta = Date.parse(`${a.date} ${a.startTime.replace(/\u202F/g,' ')}`);
+        const tb = Date.parse(`${b.date} ${b.startTime.replace(/\u202F/g,' ')}`);
+        return ta - tb;
       });
-
-      // Apply searchTerm filter (by title or venue)
-      const filtered = searchTerm.trim()
-        ? upcoming.filter(e =>
-            e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            e.venueName.toLowerCase().includes(searchTerm.toLowerCase())
-          )
-        : upcoming;
-
-      // Optionally: sort ascending
-      filtered.sort((a, b) =>
-        new Date(`${a.date}T${a.startTime}`).getTime() -
-        new Date(`${b.date}T${b.startTime}`).getTime()
-      );
 
       setEvents(filtered);
     } catch (err) {
-      console.error('❌ Error fetching events:', err);
+      console.error('Error fetching discover events:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  // refetch when we know city or searchTerm changes
   useEffect(() => {
-    if (userCity !== '' || !loading) {
-      fetchEvents();
-    }
-  }, [userCity, searchTerm]);
+    fetchEvents();
+  }, [searchTerm]);
 
   if (loading) {
     return (
@@ -112,7 +109,6 @@ const DiscoverScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
-      {/* ───────── Search + Filter Bar ───────── */}
       <View style={[styles.searchBar, {
         backgroundColor: isDark ? '#1e1e1e' : '#f0f0f0',
         borderColor: isDark ? '#333' : '#ccc'
@@ -126,12 +122,11 @@ const DiscoverScreen: React.FC = () => {
           onChangeText={setSearchTerm}
           returnKeyType="search"
         />
-        <TouchableOpacity onPress={() => {/* TODO: open filter modal */}}>
+        <TouchableOpacity onPress={fetchEvents}>
           <Ionicons name="filter-outline" size={20} color={isDark ? '#888' : '#666'} />
         </TouchableOpacity>
       </View>
 
-      {/* ───────── Event List ───────── */}
       <FlatList
         data={events}
         keyExtractor={item => item.id}
@@ -151,7 +146,8 @@ const DiscoverScreen: React.FC = () => {
             ) : null}
             <Text style={[styles.title, { color: textColor }]}>{item.title}</Text>
             <Text style={{ color: textColor }}>
-              {item.date} • {item.startTime}
+              {item.date} • {new Date(`${item.date} ${item.startTime.replace(/\u202F/g,' ')}`)
+                .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
             <Text style={{ color: textColor }}>{item.venueName}</Text>
             <Text style={{ color: textColor }}>{item.price ?? 'Free'}</Text>
@@ -163,31 +159,13 @@ const DiscoverScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 16,
-    paddingHorizontal: 12,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    marginHorizontal: 8,
-    height: '100%',
-  },
-  card: {
-    marginBottom: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
-    padding: 12,
-    elevation: 2,
-  },
-  image: { width: '100%', height: 180, borderRadius: 8, marginBottom: 8 },
-  title: { fontSize: 18, fontWeight: '600', marginBottom: 4 },
+  container:   { flex: 1 },
+  center:      { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  searchBar:   { flexDirection: 'row', alignItems: 'center', margin: 16, paddingHorizontal: 12, height: 40, borderRadius: 20, borderWidth: 1 },
+  searchInput: { flex: 1, marginHorizontal: 8, height: '100%' },
+  card:        { marginBottom: 16, borderRadius: 12, overflow: 'hidden', padding: 12, elevation: 2 },
+  image:       { width: '100%', height: 180, borderRadius: 8, marginBottom: 8 },
+  title:       { fontSize: 18, fontWeight: '600', marginBottom: 4 },
 });
 
 export default DiscoverScreen;

@@ -108,3 +108,25 @@ export function getEventById(id: string, organizerId: string) {
     `/api/events/${id}?organizerId=${organizerId}`
   );
 }
+
+
+export function saveEvent(email: string, eventId: string) {
+  return request<{ message: string }>('/api/events/saved', {
+    method: 'POST',
+    body: JSON.stringify({ email, eventId }),
+  });
+}
+
+export function getSavedEvents(email: string) {
+  return request<{ events: any[] }>('/api/events/saved', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function getTicketedEvents(email: string) {
+  return request<{ events: any[] }>('/api/events/tickets', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}

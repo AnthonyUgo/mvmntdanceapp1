@@ -20,7 +20,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
-import { login } from '../api/auth';  // ← centralized login call
+import { login } from '../api/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -48,23 +48,25 @@ const OrganizerLoginScreen: React.FC = () => {
     try {
       const data = await login(email, password);
       const profile = data.profile || data.organizer;
-      if (!profile) throw new Error('Profile missing');
-      const pairs: [string, string][] = [
+      if (!profile) throw new Error('Profile not found');
+
+      const pairs: [string,string][] = [
         ['userFirstName', profile.firstName || ''],
-        ['userLastName', profile.lastName || ''],
-        ['userUsername', profile.username || ''],
-        ['userEmail', profile.email || ''],
+        ['userLastName',  profile.lastName  || ''],
+        ['userUsername',  profile.username  || ''],
+        ['userEmail',     profile.email     || ''],
         ['userCreatedAt', profile.createdAt || ''],
-        ['userDob', profile.dob || ''],
-        ['userGender', profile.gender || ''],
-        ['userRole', profile.role || ''],
+        ['userDob',       profile.dob       || ''],
+        ['userGender',    profile.gender    || ''],
+        ['userRole',      profile.role      || ''],
       ];
       if (profile.role === 'organizer') {
         pairs.push(['organizerUsername', profile.username]);
       }
       await AsyncStorage.multiSet(pairs);
+
       Alert.alert('Success', 'Welcome back!');
-      navigation.navigate(profile.role === 'organizer' ? 'OrganizerDashboard' : 'UserDashboard');
+      navigation.replace(profile.role === 'organizer' ? 'OrganizerDashboard' : 'UserDashboard');
     } catch (err: any) {
       Alert.alert('Login Failed', err.message || 'Please try again.');
     }
@@ -116,9 +118,9 @@ const OrganizerLoginScreen: React.FC = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-              style={[styles.button, { backgroundColor: inputBg }]}
-              onPress={() => promptGoogleLogin()}
-           >
+            style={[styles.button, { backgroundColor: inputBg }]}
+            onPress={() => promptGoogleLogin()}
+          >
             <Ionicons name="logo-google" size={24} color={accent} />
             <Text style={[styles.buttonText, { color: fg }]}>
               Continue with Google
@@ -143,7 +145,7 @@ const OrganizerLoginScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
+  flex:    { flex: 1 },
   container: {
     flex: 1,
     justifyContent: 'center',
