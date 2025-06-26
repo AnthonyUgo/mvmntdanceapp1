@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Use Node.js 18.x
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18.x'
@@ -22,9 +22,9 @@ jobs:
           npm install
           npm test --if-present
 
-      - name: Package for Deployment
-        working-directory: ./mvmnt-backend
-        run: zip -r ../backend-release.zip .
+      - name: Zip backend for deployment
+        run: |
+          zip -r backend-release.zip mvmnt-backend
 
       - name: Upload Package
         uses: actions/upload-artifact@v4
@@ -36,21 +36,19 @@ jobs:
     needs: build-and-package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download package
+        uses: actions/download-artifact@v4
         with:
           name: backend-package
-
-      - name: Unzip Package
-        run: unzip backend-release.zip -d ./mvmnt-backend
 
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy to App Service
+      - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'muvs-backend-abc'
           slot-name: 'Production'
-          package: './mvmnt-backend'
+          package: 'backend-release.zip'
