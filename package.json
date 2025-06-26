@@ -43,7 +43,7 @@
   "name": "mvmntdanceapp",
   "version": "1.0.0",
   "scripts": {
-    "start": "cd mvmnt-backend && npm start",
+    "start": " npm start",
     "android": "expo start --android",
     "ios":     "expo start --ios"
   }

@@ -8,6 +8,11 @@ const { usersContainer } = require('../db');
 const upload = multer();
 const router = express.Router();
 
+router.get('/', async (req, res) => {
+  // You could list all users here, but for now just return a simple JSON to prove the route is alive:
+  res.json({ status: 'ok', message: 'Users endpoint is up!' });
+});
+
 // UPLOAD PROFILE IMAGE
 router.post('/upload-profile-image', upload.single('image'), async (req, res) => {
   const { username } = req.body;
