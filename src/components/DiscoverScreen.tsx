@@ -1,5 +1,5 @@
 // src/components/DiscoverScreen.tsx
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,10 @@ import {
   TextInput,
   TouchableOpacity,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getPublicEvents } from '../api';
 
 type EventType = {
   id: string;
@@ -31,49 +31,45 @@ type EventType = {
 
 const DiscoverScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const isDark = theme === 'dark';
+  const isDark    = theme === 'dark';
   const textColor = isDark ? '#fff' : '#000';
-  const bgColor = isDark ? '#121212' : '#fff';
+  const bgColor   = isDark ? '#121212' : '#fff';
 
-  const [userCity, setUserCity] = useState<string>('');
-  const [events, setEvents] = useState<EventType[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents]         = useState<EventType[]>([]);
+  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
 
-  // get user city but do NOT gate the fetch on it
+  // debounce the searchTerm by 500ms
   useEffect(() => {
-    (async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-      const loc = await Location.getCurrentPositionAsync({});
-      const [place] = await Location.reverseGeocodeAsync(loc.coords);
-      setUserCity(place.city || '');
-    })();
-  }, []);
+    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
-  // fetch once on mount and also on manual refresh or searchTerm change
+  // fetch on mount and whenever debouncedTerm changes
+  useEffect(() => {
+    fetchEvents();
+  }, [debouncedTerm]);
+
   const fetchEvents = async () => {
     setLoading(true);
     setRefreshing(true);
     try {
-      const res = await fetch('https://muvs-backend-abc-e5hse4csf6dhajfy.canadacentral-01.azurewebsites.net/api/events/public');
-      console.log('Discover fetch status:', res.status);
-      const body = await res.json();
-      console.log('Discover response body:', body);
-      const raw: EventType[] = Array.isArray(body.events) ? body.events : [];
+      // 1️⃣ pull **all** public events, regardless of city
+      const { events: raw } = await getPublicEvents();
+
       const now = Date.now();
       let filtered = raw
         .filter(e => e.visibility === 'public')
         .filter(e => {
-          // normalize non-breaking spaces
           const cleanTime = e.startTime.replace(/\u202F/g, ' ');
           const ts = Date.parse(`${e.date} ${cleanTime}`);
           return !isNaN(ts) && ts >= now;
         });
 
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
+      if (debouncedTerm.trim()) {
+        const q = debouncedTerm.toLowerCase();
         filtered = filtered.filter(e =>
           e.title.toLowerCase().includes(q) ||
           e.venueName.toLowerCase().includes(q)
@@ -95,10 +91,6 @@ const DiscoverScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    fetchEvents();
-  }, [searchTerm]);
-
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: bgColor }]}>
@@ -111,7 +103,7 @@ const DiscoverScreen: React.FC = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: bgColor }]}>
       <View style={[styles.searchBar, {
         backgroundColor: isDark ? '#1e1e1e' : '#f0f0f0',
-        borderColor: isDark ? '#333' : '#ccc'
+        borderColor:    isDark ? '#333' : '#ccc'
       }]}>
         <Ionicons name="search-outline" size={20} color={isDark ? '#888' : '#666'} />
         <TextInput
@@ -136,17 +128,16 @@ const DiscoverScreen: React.FC = () => {
         contentContainerStyle={events.length === 0 ? styles.center : { padding: 16 }}
         ListEmptyComponent={
           <Text style={{ color: textColor, textAlign: 'center' }}>
-            No upcoming events{ userCity ? ` in ${userCity}` : '' }.
+            No upcoming events.
           </Text>
         }
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: isDark ? '#1e1e1e' : '#fff' }]}>
-            {item.image ? (
-              <Image source={{ uri: item.image }} style={styles.image} />
-            ) : null}
+            {item.image && <Image source={{ uri: item.image }} style={styles.image} />}
             <Text style={[styles.title, { color: textColor }]}>{item.title}</Text>
             <Text style={{ color: textColor }}>
-              {item.date} • {new Date(`${item.date} ${item.startTime.replace(/\u202F/g,' ')}`)
+              {item.date} •{' '}
+              {new Date(`${item.date} ${item.startTime.replace(/\u202F/g,' ')}`)
                 .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
             <Text style={{ color: textColor }}>{item.venueName}</Text>
