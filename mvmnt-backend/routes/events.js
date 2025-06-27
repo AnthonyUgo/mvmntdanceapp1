@@ -110,6 +110,29 @@ router.delete('/:id', async (req, res) => {
 });
 
 // ───────────────
+// 3.4) PUBLIC EVENTS
+// GET /api/events/public
+router.get('/public', async (req, res) => {
+  try {
+    // optionally filter by city:
+    const city = req.query.city;
+    let sql   = 'SELECT * FROM c WHERE c.draft = false';
+    const params = [];
+    if (city) {
+      sql += ' AND c.venueCity = @city';
+      params.push({ name: '@city', value: city });
+    }
+    const { resources } = await eventsContainer
+      .items.query({ query: sql, parameters: params })
+      .fetchAll();
+    res.json({ events: resources });
+  } catch (err) {
+    console.error('❌ Fetch public events error:', err);
+    res.status(500).json({ error: 'Server error.' });
+  }
+});
+
+// ───────────────
 // 4) GET ALL FOR AN ORGANIZER
 // GET /api/events?organizerId=...&draft=true|false
 router.get('/', async (req, res) => {
