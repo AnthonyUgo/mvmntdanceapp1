@@ -59,10 +59,10 @@ export function updateProfileImage(username: string, imageUri: string) {
 
 /** Events */
 export function getPublicEvents(city?: string): Promise<{ events: any[] }> {
-  const path = city
-    ? `/api/events/public?city=${encodeURIComponent(city)}`
-    : '/api/events/public';
-  return request<{ events: any[] }>(path);
+  const qs = city
+    ? `?city=${encodeURIComponent(city)}`
+    : '';
+  return request<{ events: any[] }>(`/api/events${qs}`);
 }
 
 export function getEventsForOrganizer(organizerId: string, draft = false) {

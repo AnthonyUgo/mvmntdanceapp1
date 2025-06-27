@@ -111,49 +111,40 @@ router.delete('/:id', async (req, res) => {
 
 // ───────────────
 // 3.4) PUBLIC EVENTS
-// GET /api/events/public
-router.get('/public', async (req, res) => {
-  try {
-    // optionally filter by city:
-    const city = req.query.city;
-    let sql   = 'SELECT * FROM c WHERE c.draft = false';
-    const params = [];
-    if (city) {
-      sql += ' AND c.venueCity = @city';
-      params.push({ name: '@city', value: city });
-    }
-    const { resources } = await eventsContainer
-      .items.query({ query: sql, parameters: params })
-      .fetchAll();
-    res.json({ events: resources });
-  } catch (err) {
-    console.error('❌ Fetch public events error:', err);
-    res.status(500).json({ error: 'Server error.' });
-  }
-});
-
-// ───────────────
-// 4) GET ALL FOR AN ORGANIZER
-// GET /api/events?organizerId=...&draft=true|false
+/ GET /api/events
+//  • ?organizerId=… → organizer’s events
+//  • (no organizerId) → all public events (filterable by ?city=…)
 router.get('/', async (req, res) => {
-  const { organizerId, draft } = req.query;
-  if (!organizerId) return res.status(400).json({ error: 'organizerId required.' });
-
-  let query = 'SELECT * FROM c WHERE c.organizerId = @o';
-  const params = [{ name: '@o', value: organizerId }];
-  if (draft !== undefined) {
-    query += ' AND c.draft = @d';
-    params.push({ name: '@d', value: draft === 'true' });
-  }
-
+  const { organizerId, draft, city } = req.query;
   try {
-    const { resources } = await eventsContainer
-      .items.query({ query, parameters: params })
-      .fetchAll();
-    res.json(resources);
+    if (organizerId) {
+      // organizer’s events
+      let sql    = 'SELECT * FROM c WHERE c.organizerId = @o';
+      const params = [{ name: '@o', value: organizerId }];
+      if (draft !== undefined) {
+        sql += ' AND c.draft = @d';
+        params.push({ name: '@d', value: draft === 'true' });
+      }
+      const { resources } = await eventsContainer
+        .items.query({ query: sql, parameters: params })
+        .fetchAll();
+      return res.json(resources);
+    } else {
+      // public discover events
+      let sql    = 'SELECT * FROM c WHERE c.draft = false';
+      const params = [];
+      if (city) {
+        sql += ' AND c.venueCity = @city';
+        params.push({ name: '@city', value: city });
+      }
+      const { resources } = await eventsContainer
+        .items.query({ query: sql, parameters: params })
+        .fetchAll();
+      return res.json({ events: resources });
+    }
   } catch (err) {
     console.error('❌ Fetch events error:', err);
-    res.status(500).json({ error: 'Server error.' });
+    return res.status(500).json({ error: 'Server error.' });
   }
 });
 
@@ -175,20 +166,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ───────────────
-// 6) PUBLIC EVENTS
-// GET /api/events/public
-router.get('/public', async (_req, res) => {
-  try {
-    const { resources } = await eventsContainer
-      .items.query({ query: 'SELECT * FROM c WHERE c.draft = false' })
-      .fetchAll();
-    res.json({ events: resources });
-  } catch (err) {
-    console.error('❌ Fetch public events error:', err);
-    res.status(500).json({ error: 'Server error.' });
-  }
-});
 
 // ───────────────
 // 7) SAVED EVENTS

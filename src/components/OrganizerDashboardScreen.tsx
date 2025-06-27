@@ -162,7 +162,7 @@ const OrganizerDashboardScreen: React.FC = () => {
       {/* View Events */}
       <TouchableOpacity
         style={[styles.button, { backgroundColor: bgColor }]}
-        onPress={() => navigation.navigate('MyEvents')}
+        onPress={() => navigation.navigate('MyEvents', { initialTab: 'live' })}
       >
         <Ionicons
           name="people-circle-outline"
