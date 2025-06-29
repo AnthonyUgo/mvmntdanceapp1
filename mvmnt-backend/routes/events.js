@@ -111,7 +111,7 @@ router.delete('/:id', async (req, res) => {
 
 // ───────────────
 // 3.4) PUBLIC EVENTS
-/ GET /api/events
+// GET /api/events
 //  • ?organizerId=… → organizer’s events
 //  • (no organizerId) → all public events (filterable by ?city=…)
 router.get('/', async (req, res) => {
