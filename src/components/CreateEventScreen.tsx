@@ -1,409 +1,482 @@
-// 1️⃣ Polyfill for uuid:
+// src/screens/CreateEventScreen.tsx
 import 'react-native-get-random-values';
-
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useContext } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-  Alert,
-  Image,
-  Switch,
-  ActivityIndicator,
+View, Text, TextInput, TouchableOpacity, StyleSheet,
+Image, ScrollView, Dimensions, KeyboardAvoidingView,
+Platform, TouchableWithoutFeedback, Keyboard, Alert
 } from 'react-native';
-import { ThemeContext } from '../contexts/ThemedContext';
-import { Ionicons } from '@expo/vector-icons';
+import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { launchImageLibraryAsync, MediaTypeOptions } from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ThemeContext } from '../contexts/ThemedContext';
+import { createEvent } from '../api';
 import type { RootStackParamList } from '../../App';
 
-// centralized wrappers:
-import {
-  createEvent,
-  getPublicEvents,
-} from '../api/index';
-
-const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY!;
+type NavProp = NativeStackNavigationProp<RootStackParamList, 'CreateEvent'>;
+const initialLayout = { width: Dimensions.get('window').width };
 
 const CreateEventScreen: React.FC = () => {
-  const { theme } = useContext(ThemeContext);
-  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const bg = theme === 'dark' ? '#121212' : '#fff';
-  const txt = theme === 'dark' ? '#fff' : '#000';
-  const accent = '#4285F4';
+const nav = useNavigation<NavProp>();
+const { theme } = useContext(ThemeContext);
+const isDark = theme === 'dark';
+const [index, setIndex] = useState(0);
+const [routes] = useState([
+{ key: 'image', title: 'Image' },
+{ key: 'details', title: 'Details' },
+{ key: 'tickets', title: 'Tickets' },
+{ key: 'settings', title: 'Settings' }
+]);
 
-  // form state
-  const [imageUri, setImageUri]   = useState<string|null>(null);
-  const [eventName, setEventName] = useState('');
-  const [venueName, setVenueName] = useState('');
-  const [unit, setUnit]           = useState('');
-  const [street, setStreet]       = useState('');
-  const [city, setCity]           = useState('');
-  const [stateCode, setStateCode] = useState('');
-  const [zip, setZip]             = useState('');
-  const [date, setDate]           = useState(new Date());
-  const [showDate, setShowDate]   = useState(false);
-  const [start, setStart]         = useState(new Date());
-  const [showStart, setShowStart] = useState(false);
-  const [end, setEnd]             = useState(new Date());
-  const [showEnd, setShowEnd]     = useState(false);
-  const [price, setPrice]         = useState('');
-  const [quantity, setQuantity]   = useState(1);
-  const [collab, setCollab]       = useState('');
-  const [isPrivate, setIsPrivate] = useState(false);
+const [imageUri, setImageUri] = useState<string|null>(null);
+const [title, setTitle] = useState('');
+const [description, setDescription] = useState('');
+const [date, setDate] = useState(new Date());
+const [startTime, setStartTime] = useState(new Date());
+const [endTime, setEndTime] = useState(new Date());
+const [venueName, setVenueName] = useState('');
+const [venueAddress, setVenueAddress] = useState('');
+const [ticketName, setTicketName] = useState('');
+const [ticketType, setTicketType] = useState<'Paid' | 'Free' | 'Donation'>('Paid');
+const [ticketOptions, setTicketOptions] = useState<{ name: string; price?: string; qty: string }[]>([]);
+const [currentTicket, setCurrentTicket] = useState({ name: '', price: '', qty: '' });
+const [ticketPrice, setTicketPrice] = useState('');
+const [ticketQty, setTicketQty] = useState('');
+const [isPrivate, setIsPrivate] = useState(false);
 
-  // show a loader on initial public-events fetch
-  const [publicEvents, setPublicEvents] = useState<any[]|null>(null);
-  useEffect(() => {
-    getPublicEvents()
-      .then(r => setPublicEvents(r.events))
-      .catch(() => setPublicEvents([]));
-  }, []);
+const pickImage = async () => {
+const res = await launchImageLibraryAsync({
+mediaTypes: MediaTypeOptions.Images,
+allowsEditing: true,
+quality: 0.8
+});
+if (!res.canceled && res.assets.length) setImageUri(res.assets[0].uri);
+};
 
-  const pickImage = async () => {
-    const res = await launchImageLibraryAsync({
-      mediaTypes: MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
-    if (!res.canceled && res.assets.length) {
-      setImageUri(res.assets[0].uri);
-    }
+const handlePublish = async () => {
+const organizerId = await AsyncStorage.getItem('organizerUsername');
+if (!title || !venueName || !ticketName || !ticketQty) {
+return Alert.alert('Missing required fields');
+}
+const payload = {
+  id: Date.now().toString(),
+  title,
+  image: imageUri,
+  date: date.toISOString().slice(0, 10),
+  startTime: startTime.toTimeString().slice(0, 5),
+  venueName,
+  venueAddress,
+  tickets: ticketOptions.map(t => ({
+  name: t.name,
+  price: ticketType === 'Paid' ? parseFloat(t.price || '0') : 0,
+  quantity: parseInt(t.qty, 10),
+  type: ticketType,
+})),
+  visibility: isPrivate ? 'private' : 'public',
+  organizerId,
+};
+
+try {
+  await createEvent(payload);
+  Alert.alert('Success', 'Event created');
+  nav.goBack();
+} catch (err: any) {
+  console.error(err);
+  Alert.alert('Error', err.message || 'Failed to create event');
+}
+};
+const ImageStep = () => (
+<ScrollView contentContainerStyle={styles.step}>
+<TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+{imageUri
+? <Image source={{ uri: imageUri }} style={styles.image} />
+: <Text style={styles.placeholder}>+ Add Event Image</Text>}
+</TouchableOpacity>
+<TextInput
+style={[styles.input, { color: isDark ? '#fff' : '#000' }]}
+placeholder="Name Am"
+placeholderTextColor="#888"
+value={title}
+onChangeText={setTitle}
+/>
+<TextInput
+    style={[styles.input, { color: isDark ? '#fff' : '#000', height: 100 }]}
+    placeholder="Wetin Dey Sup?"
+    placeholderTextColor="#888"
+    multiline
+    value={description}
+    onChangeText={setDescription}
+  />
+</ScrollView>
+);
+
+const [startDate, setStartDate] = useState(new Date());
+const [endDate, setEndDate] = useState(new Date());
+const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+const [showStartTimePicker, setShowStartTimePicker] = useState(false);
+const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+
+const DetailsStep = () => (
+  <ScrollView contentContainerStyle={styles.step}>
+    <Text style={styles.label}>Start Date</Text>
+    <TouchableOpacity style={styles.input} onPress={() => setShowStartDatePicker(true)}>
+      <Text>{startDate.toDateString()}</Text>
+    </TouchableOpacity>
+    {showStartDatePicker && (
+      <DateTimePicker
+        value={startDate}
+        mode="date"
+        display="default"
+        onChange={(event, selectedDate) => {
+          setShowStartDatePicker(false);
+          if (selectedDate) setStartDate(selectedDate);
+        }}
+      />
+    )}
+
+    <Text style={styles.label}>End Date</Text>
+    <TouchableOpacity style={styles.input} onPress={() => setShowEndDatePicker(true)}>
+      <Text>{endDate.toDateString()}</Text>
+    </TouchableOpacity>
+    {showEndDatePicker && (
+      <DateTimePicker
+        value={endDate}
+        mode="date"
+        display="default"
+        onChange={(event, selectedDate) => {
+          setShowEndDatePicker(false);
+          if (selectedDate) setEndDate(selectedDate);
+        }}
+      />
+    )}
+    {startDate && endDate && (
+  <Text style={[styles.label, { marginTop: 4 }]}>
+    Duration: {Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)} day(s)
+  </Text>
+)}
+
+
+    <Text style={styles.label}>Start Time</Text>
+    <TouchableOpacity style={styles.input} onPress={() => setShowStartTimePicker(true)}>
+      <Text>{startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</Text>
+    </TouchableOpacity>
+    {showStartTimePicker && (
+      <DateTimePicker
+        value={startTime}
+        mode="time"
+        is24Hour={false}
+        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+        onChange={(event, selectedTime) => {
+          setShowStartTimePicker(false);
+          if (selectedTime) setStartTime(selectedTime);
+        }}
+      />
+    )}
+
+    <Text style={styles.label}>End Time</Text>
+    <TouchableOpacity style={styles.input} onPress={() => setShowEndTimePicker(true)}>
+      <Text>{endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}</Text>
+    </TouchableOpacity>
+    {showEndTimePicker && (
+      <DateTimePicker
+        value={endTime}
+        mode="time"
+        is24Hour={false}
+        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+        onChange={(event, selectedTime) => {
+          setShowEndTimePicker(false);
+          if (selectedTime) setEndTime(selectedTime);
+        }}
+      />
+    )}
+
+    <Text style={styles.label}>Venue Name</Text>
+    <TextInput
+      style={styles.input}
+      placeholder="Venue Name"
+      placeholderTextColor="#888"
+      value={venueName}
+      onChangeText={setVenueName}
+    />
+
+    <Text style={styles.label}>Venue Address</Text>
+    <TextInput
+      style={styles.input}
+      placeholder="Venue Address"
+      placeholderTextColor="#888"
+      value={venueAddress}
+      onChangeText={setVenueAddress}
+    />
+  </ScrollView>
+);
+
+
+const TicketStep = () => {
+  const [ticketType, setTicketType] = useState('Paid');
+  const [ticketOptions, setTicketOptions] = useState<any[]>([]);
+  const [currentTicket, setCurrentTicket] = useState({ name: '', price: '', qty: '', timeLimit: '' });
+
+  const addTicket = () => {
+    if (!currentTicket.name || !currentTicket.qty) return;
+    setTicketOptions([...ticketOptions, { ...currentTicket }]);
+    setCurrentTicket({ name: '', price: '', qty: '', timeLimit: '' });
   };
 
-  const extract = (comps: any[], type: string) =>
-    comps.find(c => c.types.includes(type))?.long_name || '';
+  const deleteTicket = (index: number) => {
+    const updated = [...ticketOptions];
+    updated.splice(index, 1);
+    setTicketOptions(updated);
+  };
 
-  const handleSave = async (draft: boolean) => {
-    if (!eventName || !venueName || !street || !city || !stateCode || !zip) {
-      return Alert.alert('Missing Fields', 'Please complete all required fields.');
-    }
-    const organizerId = await AsyncStorage.getItem('organizerUsername');
-    if (!organizerId) {
-      return Alert.alert('Not signed in', 'Please log in as an organizer.');
-    }
-
-    const payload = {
-      id: Date.now().toString(),
-      title: eventName,
-      date: date.toISOString().slice(0, 10),
-      startTime: start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      endTime: end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      venueName,
-      venueAddress: `${street}${unit ? `, Apt ${unit}` : ''}, ${city}, ${stateCode} ${zip}`,
-      venueCity: city,
-      venueState: stateCode,
-      venueZip: zip,
-      price,
-      quantity,
-      collaborator: collab,
-      image: imageUri,
-      draft,
-      visibility: isPrivate ? 'private' : 'public',
-      shareCode: isPrivate ? Math.random().toString(36).substr(2, 8) : null,
-      tickets: [],
-      organizerId,
-    };
-
-    try {
-      // use the centralized wrapper
-      await createEvent(payload);
-      Alert.alert('Success', draft ? 'Saved as draft' : 'Published!');
-      nav.navigate('MyEvents', { initialTab: draft ? 'drafts' : 'live' });
-    } catch (e: any) {
-      console.warn(e);
-      Alert.alert('Error', e.message);
-    }
+  const editTicket = (index: number) => {
+    const toEdit = ticketOptions[index];
+    deleteTicket(index);
+    setCurrentTicket(toEdit);
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={[styles.full, { backgroundColor: bg }]}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.container}>
-          <Text style={[styles.header, { color: txt }]}>Create Event</Text>
-
-          {/* IMAGE PICKER */}
-          <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-            {imageUri
-              ? <Image source={{ uri: imageUri }} style={styles.image} />
-              : <View style={styles.placeholder}>
-                  <Ionicons name="camera-outline" size={40} color={accent} />
-                  <Text style={{ color: accent }}>Add Event Image</Text>
-                </View>
-            }
+    <ScrollView contentContainerStyle={styles.step}>
+      <Text style={styles.label}>Select Ticket Type</Text>
+      <View style={styles.dropdownContainer}>
+        {['Paid', 'Free', 'Donation'].map(type => (
+          <TouchableOpacity
+            key={type}
+            onPress={() => setTicketType(type)}
+            style={[styles.dropdownOption, ticketType === type && styles.selectedOption]}>
+            <Text>{type}</Text>
           </TouchableOpacity>
+        ))}
+      </View>
 
-          {/* EVENT NAME */}
+      <Text style={styles.label}>Ticket Name</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="e.g. Regular, VIP, BFF"
+        placeholderTextColor="#888"
+        value={currentTicket.name}
+        onChangeText={(text) => setCurrentTicket({ ...currentTicket, name: text })}
+      />
+
+      {ticketType === 'Paid' && (
+        <>
+          <Text style={styles.label}>Price</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-            placeholder="Event Name"
+            style={styles.input}
+            placeholder="e.g. 10.00"
             placeholderTextColor="#888"
-            value={eventName}
-            onChangeText={setEventName}
+            keyboardType="decimal-pad"
+            value={currentTicket.price}
+            onChangeText={(text) => setCurrentTicket({ ...currentTicket, price: text })}
           />
 
-
-          {/* VENUE NAME (manual) */}
+          <Text style={styles.label}>Time Limit (Optional)</Text>
           <TextInput
-              style={[styles.input,{ backgroundColor: theme==='dark'?'#1e1e1e':'#f5f5f5', color: txt }]}
-              placeholder="Venue Name"
-              placeholderTextColor="#888"
-              value={venueName}
-              onChangeText={setVenueName}
-              />
-
-              
-          {/* GOOGLE PLACES */}
-          <GooglePlacesAutocomplete
-            placeholder="Search venue"
-            fetchDetails
-            query={{ key: GOOGLE_PLACES_API_KEY, language: 'en', types: 'establishment' }}
-            predefinedPlaces={[]}
-            textInputProps={{
-              style: {
-                ...styles.input,
-                paddingLeft: 20,
-                backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5',
-                color: txt,
-              }
-            }}
-            onPress={(data, details) => {
-              setVenueName(data.description);
-              const comps = details?.address_components || [];
-              setStreet(extract(comps, 'street_number') + ' ' + extract(comps, 'route'));
-              setCity(extract(comps, 'locality'));
-              setStateCode(extract(comps, 'administrative_area_level_1'));
-              setZip(extract(comps, 'postal_code'));
-            }}
-            styles={{
-              container: { flex: 0, marginBottom: 16 },
-              listView: { backgroundColor: theme === 'dark' ? '#333' : '#fff' }
-            }}
-          />
-
-          {/* ADDRESS FIELDS */}
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.half, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-              placeholder="Street"
-              placeholderTextColor="#888"
-              value={street}
-              onChangeText={setStreet}
-            />
-            <TextInput
-              style={[styles.input, styles.half, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-              placeholder="Apt/Unit (opt.)"
-              placeholderTextColor="#888"
-              value={unit}
-              onChangeText={setUnit}
-            />
-          </View>
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.half, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-              placeholder="City"
-              placeholderTextColor="#888"
-              value={city}
-              onChangeText={setCity}
-            />
-            <TextInput
-              style={[styles.input, styles.half, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-              placeholder="State"
-              placeholderTextColor="#888"
-              value={stateCode}
-              onChangeText={setStateCode}
-            />
-          </View>
-          <TextInput
-            style={[styles.input, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-            placeholder="ZIP Code"
+            style={styles.input}
+            placeholder="e.g. Early bird ends in 2 days"
             placeholderTextColor="#888"
-            value={zip}
-            keyboardType="numeric"
-            onChangeText={setZip}
+            value={currentTicket.timeLimit}
+            onChangeText={(text) => setCurrentTicket({ ...currentTicket, timeLimit: text })}
           />
+        </>
+      )}
 
-          {/* DATE & TIME PICKERS */}
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.input, styles.half, { justifyContent: 'center' }]} onPress={() => setShowDate(true)}>
-              <Text style={{ color: txt }}>{date.toDateString()}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.input, styles.half, { justifyContent: 'center' }]} onPress={() => setShowStart(true)}>
-              <Text style={{ color: txt }}>{start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-            </TouchableOpacity>
-          </View>
-          {showDate && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={(_, d) => {
-                setShowDate(false);
-                if (d) setDate(d);
-              }}
-            />
-          )}
-          {showStart && (
-            <DateTimePicker
-              value={start}
-              mode="time"
-              display="default"
-              onChange={(_, t) => {
-                setShowStart(false);
-                if (t) setStart(t);
-              }}
-            />
-          )}
-          <TouchableOpacity style={[styles.input, { justifyContent: 'center' }]} onPress={() => setShowEnd(true)}>
-            <Text style={{ color: txt }}>End: {end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-          </TouchableOpacity>
-          {showEnd && (
-            <DateTimePicker
-              value={end}
-              mode="time"
-              display="default"
-              onChange={(_, t) => {
-                setShowEnd(false);
-                if (t) setEnd(t);
-              }}
-            />
-          )}
+      <Text style={styles.label}>Quantity</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Quantity"
+        placeholderTextColor="#888"
+        keyboardType="number-pad"
+        value={currentTicket.qty}
+        onChangeText={(text) => setCurrentTicket({ ...currentTicket, qty: text })}
+      />
 
-          {/* PRICE & QUANTITY */}
-          <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.half, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-              placeholder="Price (0.00)"
-              placeholderTextColor="#888"
-              keyboardType="decimal-pad"
-              value={price}
-              onChangeText={setPrice}
-            />
-            <View style={[styles.qtyContainer, { borderColor: accent }]}>
-              <Ionicons
-                name="remove-circle-outline"
-                size={28}
-                color={accent}
-                onPress={() => quantity > 1 && setQuantity(q => q - 1)}
-              />
-              <Text style={{ fontSize: 18, color: txt }}>{quantity}</Text>
-              <Ionicons
-                name="add-circle-outline"
-                size={28}
-                color={accent}
-                onPress={() => setQuantity(q => q + 1)}
-              />
+      <TouchableOpacity onPress={addTicket}>
+        <Text style={[styles.navText, { textAlign: 'center' }]}>Add Ticket</Text>
+      </TouchableOpacity>
+
+      {ticketOptions.length > 0 && (
+        <>
+          <Text style={styles.label}>Tickets Added</Text>
+          {ticketOptions.map((t, i) => (
+            <View key={i} style={{ marginBottom: 12 }}>
+              <Text>
+                • {t.name} – {ticketType === 'Paid' ? `$${t.price}` : ticketType} – {t.qty} available
+              </Text>
+              {t.timeLimit ? <Text style={{ fontSize: 12, color: '#999' }}>⏰ {t.timeLimit}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity onPress={() => editTicket(i)}>
+                  <Text style={{ color: '#007aff' }}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteTicket(i)}>
+                  <Text style={{ color: '#ff3b30' }}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-
-          {/* COLLABORATOR & PRIVATE SWITCH */}
-          <TextInput
-            style={[styles.input, { backgroundColor: theme === 'dark' ? '#1e1e1e' : '#f5f5f5', color: txt }]}
-            placeholder="Collaborator username or email"
-            placeholderTextColor="#888"
-            value={collab}
-            onChangeText={setCollab}
-          />
-          <View style={styles.row}>
-            <Switch
-              value={isPrivate}
-              onValueChange={setIsPrivate}
-              trackColor={{ false: '#ccc', true: accent }}
-              thumbColor="#fff"
-            />
-            <Text style={{ marginLeft: 8, color: txt }}>Private event</Text>
-          </View>
-
-          {/* ACTION BUTTONS */}
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.btnOutline, { borderColor: accent }]} onPress={() => handleSave(true)}>
-              <Ionicons name="save-outline" size={20} color={accent} />
-              <Text style={[styles.btnText, { color: accent }]}> Save Draft</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnFill, { backgroundColor: accent }]} onPress={() => handleSave(false)}>
-              <Ionicons name="checkmark-outline" size={20} color="#fff" />
-              <Text style={styles.btnText}> Publish</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+          ))}
+        </>
+      )}
+    </ScrollView>
   );
 };
 
+
+const SettingsStep = () => (
+<ScrollView contentContainerStyle={styles.step}>
+<TouchableOpacity onPress={() => setIsPrivate(p => !p)}>
+<Text style={{ color: isPrivate ? '#4285F4' : '#888' }}>
+{isPrivate ? 'Private' : 'Public'}
+</Text>
+</TouchableOpacity>
+</ScrollView>
+);
+
+const renderScene = SceneMap({
+image: ImageStep,
+details: DetailsStep,
+tickets: TicketStep,
+settings: SettingsStep
+});
+
+return (
+<KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+<TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+<View style={{ flex: 1 }}>
+<TabView
+navigationState={{ index, routes }}
+renderScene={renderScene}
+onIndexChange={setIndex}
+initialLayout={initialLayout}
+renderTabBar={props => (
+<TabBar
+{...props}
+scrollEnabled
+style={{ backgroundColor: isDark ? '#111' : '#eee' }}
+indicatorStyle={{ backgroundColor: '#4285F4' }}
+activeColor={isDark ? '#fff' : '#000'}
+inactiveColor="#888"
+/>
+)}
+/>
+<View style={styles.navButtons}>
+{index > 0 && (
+<TouchableOpacity onPress={() => setIndex(i => i - 1)}>
+<Text style={styles.navText}>Back</Text>
+</TouchableOpacity>
+)}
+{index < routes.length - 1 ? (
+<TouchableOpacity onPress={() => setIndex(i => i + 1)}>
+<Text style={[styles.navText, { color: '#4285F4' }]}>Next</Text>
+</TouchableOpacity>
+) : (
+<TouchableOpacity onPress={handlePublish}>
+<Text style={[styles.navText, { color: '#4285F4' }]}>Publish</Text>
+</TouchableOpacity>
+)}
+</View>
+</View>
+</TouchableWithoutFeedback>
+</KeyboardAvoidingView>
+);
+};
+
+export default CreateEventScreen;
+
 const styles = StyleSheet.create({
-  full:        { flex: 1 },
-  container:   { padding: 20, paddingBottom: 40 },
-  header:      { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
+  step: {
+    padding: 16,
+    backgroundColor: '#f9f9f9',
+    flexGrow: 1,
+  },
   imagePicker: {
-    height: 180,
+    height: 200,
     borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
+    borderColor: '#ccc',
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  image:       { width: '100%', height: '100%' },
-  placeholder: { alignItems: 'center' },
-  input:       {
-    width: '100%',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    fontSize: 16,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  row:         { flexDirection: 'row', justifyContent: 'space-between' },
-  half:        { width: '48%' },
-  qtyContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
+  label: {
+   fontSize: 14,
+   fontWeight: '600',
+   color: '#333',
+   marginBottom: 4,
+   marginTop: 12,
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
+  },
+  placeholder: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  input: {
+    width: '100%',
+    backgroundColor: '#fff',
     borderRadius: 12,
+    padding: 14,
+    marginBottom: 18,
+    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  navButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderTopWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  navText: {
+    fontSize: 17,
+    fontWeight: '600',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    width: '48%',
+    borderRadius: 20,
+    overflow: 'hidden',
+    color: '#4285F4',
   },
-  btnFill:     {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  btnOutline:  {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginRight: 8,
-    borderWidth: 1,
-  },
-  btnText:     { color: '#fff', fontSize: 16, marginLeft: 6 },
+  dropdownContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginBottom: 16,
+},
+dropdownOption: {
+  flex: 1,
+  padding: 12,
+  backgroundColor: '#eee',
+  marginHorizontal: 4,
+  borderRadius: 8,
+  alignItems: 'center',
+},
+selectedOption: {
+  backgroundColor: '#4285F4',
+  borderColor: '#000',
+  borderWidth: 1,
+},
 });
-
-export default CreateEventScreen;

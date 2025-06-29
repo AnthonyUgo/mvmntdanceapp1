@@ -15,6 +15,7 @@ import SettingsScreen from './src/components/SettingScreen';
 import CreateEventScreen from './src/components/CreateEventScreen';
 import MyEventsScreen from './src/components/MyEventScreen';
 import ManageEventScreen from './src/components/ManageEventScreen';
+import FinancialsScreen from './src/components/FinancialsScreen';
 import WebviewScreen from './src/components/WebviewScreen';
 
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
@@ -31,6 +32,7 @@ export type RootStackParamList = {
   ManageEvent: { eventId: string; isCollaborator?: boolean };
   Profile: undefined;
   Settings: undefined;
+  Financials: undefined;
   ForgotPassword: undefined;
   WebviewScreen: { url: string };
   UserDashboard: undefined;
@@ -62,7 +64,9 @@ export default function App() {
               <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: 'Create Event' }} />
               <Stack.Screen name="MyEvents" component={MyEventsScreen} options={{ title: 'My Events' }} />
               <Stack.Screen name="ManageEvent" component={ManageEventScreen} options={{ title: 'Manage Event' }} />
+              <Stack.Screen name="Financials" component={FinancialsScreen} options={{ title: 'Manage Ego' }} />
               <Stack.Screen name="WebviewScreen" component={WebviewScreen} options={{ title: 'Map View' }} />
+              
             </Stack.Navigator>
           </NavigationContainer>
         )}
