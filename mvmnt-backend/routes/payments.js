@@ -6,25 +6,38 @@ const User = require('../models/User'); // Update with your actual User model
 
 // ========== 1. CREATE OR RETURN STRIPE ACCOUNT ========== //
 router.post('/create-stripe-account', async (req, res) => {
-  const { userId } = req.body;
+  const { email } = req.body;
 
   try {
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    // 1. Find the user by email
+    const { resources } = await usersContainer.items
+      .query({
+        query: 'SELECT * FROM c WHERE c.email=@e',
+        parameters: [{ name: '@e', value: email }]
+      }).fetchAll();
 
+    if (!resources.length) return res.status(404).json({ error: 'User not found' });
+
+    const user = resources[0];
+
+    // 2. If they already have a Stripe account, return login link
     if (user.stripeAccountId) {
       const loginLink = await stripe.accounts.createLoginLink(user.stripeAccountId);
       return res.json({ alreadyConnected: true, loginLink: loginLink.url });
     }
 
+    // 3. Create Stripe Express account
     const account = await stripe.accounts.create({
       type: 'express',
+      email: user.email,
       capabilities: { transfers: { requested: true } },
     });
 
+    // 4. Save the Stripe account ID back to user
     user.stripeAccountId = account.id;
-    await user.save();
+    await usersContainer.items.upsert(user, { partitionKey: user.username });
 
+    // 5. Generate onboarding link
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
       refresh_url: 'https://mvmntdanceapp.azurestaticapps.net/organizer/stripe-error',
@@ -34,7 +47,7 @@ router.post('/create-stripe-account', async (req, res) => {
 
     res.json({ onboardingUrl: accountLink.url });
   } catch (err) {
-    console.error('Stripe Account Error:', err);
+    console.error('❌ Stripe Account Error:', err);
     res.status(500).json({ error: 'Stripe account setup failed', details: err.message });
   }
 });

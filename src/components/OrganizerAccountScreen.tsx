@@ -216,17 +216,12 @@ const OrganizerAccountScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity
   style={styles.item}
-  onPress={() => {
-    if (userId) {
-      navigation.navigate('Financials', { userId });
-    } else {
-      Alert.alert('Error', 'User ID not available.');
-    }
-  }}
+  onPress={() => navigation.navigate('Financials')}
 >
   <Ionicons name="cash-outline" size={20} color={accentColor} />
   <Text style={[styles.itemText, { color: textColor }]}>Financials</Text>
 </TouchableOpacity>
+
 
 
         {/* Toggle Button for View Switching */}
