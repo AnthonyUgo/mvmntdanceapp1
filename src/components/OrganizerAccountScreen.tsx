@@ -17,17 +17,20 @@ import * as Location from 'expo-location';
 import { isOrganizer } from '../utils/user';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
 import { useIsFocused } from '@react-navigation/native';
 
 
 const OrganizerAccountScreen: React.FC = () => {
   const { theme } = useContext(ThemeContext);
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const isFocused = useIsFocused();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [username, setUsername] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [location, setLocation] = useState<string>('Fetching location...');
   const [isEditing, setIsEditing] = useState(false);
@@ -49,6 +52,7 @@ const OrganizerAccountScreen: React.FC = () => {
                setFirstName(user.firstName);
                setLastName(user.lastName);
                setUsername(user.username);
+               setUserId(user._id);
                setProfileImage(user.profileImage);        // ← now you’re using the blob URL
               // optional: cache locally for quick loads
               await AsyncStorage.setItem('userProfileImage', user.profileImage);
@@ -210,10 +214,20 @@ const OrganizerAccountScreen: React.FC = () => {
           <Ionicons name="people-outline" size={20} color={accentColor} />
           <Text style={[styles.itemText, { color: textColor }]}>Team Members</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.item}>
-          <Ionicons name="cash-outline" size={20} color={accentColor} />
-          <Text style={[styles.itemText, { color: textColor }]}>Financials</Text>
-        </TouchableOpacity>
+        <TouchableOpacity
+  style={styles.item}
+  onPress={() => {
+    if (userId) {
+      navigation.navigate('Financials', { userId });
+    } else {
+      Alert.alert('Error', 'User ID not available.');
+    }
+  }}
+>
+  <Ionicons name="cash-outline" size={20} color={accentColor} />
+  <Text style={[styles.itemText, { color: textColor }]}>Financials</Text>
+</TouchableOpacity>
+
 
         {/* Toggle Button for View Switching */}
         <TouchableOpacity style={styles.item} onPress={handleToggleView}>
