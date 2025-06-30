@@ -102,6 +102,7 @@ router.get('/by-username', async (req, res) => {
        firstName: u.firstName,
        lastName: u.lastName,
        username: u.username,
+       _id: u.id || u._id,
        email: u.email,
        dob: u.dob,
        gender: u.gender,

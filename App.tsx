@@ -32,7 +32,7 @@ export type RootStackParamList = {
   ManageEvent: { eventId: string; isCollaborator?: boolean };
   Profile: undefined;
   Settings: undefined;
-  Financials: undefined;
+  Financials: { userId: string };
   ForgotPassword: undefined;
   WebviewScreen: { url: string };
   UserDashboard: undefined;
