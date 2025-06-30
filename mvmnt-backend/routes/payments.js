@@ -20,6 +20,10 @@ router.post('/create-stripe-account', async (req, res) => {
 
     const user = resources[0];
 
+    console.log('[Stripe] Email (userId):', userId);
+    console.log('[Stripe] ENV Key starts with:', process.env.STRIPE_SECRET_KEY?.slice(0, 10));
+
+
     // 2. If they already have a Stripe account, return login link
     if (user.stripeAccountId) {
       const loginLink = await stripe.accounts.createLoginLink(user.stripeAccountId);
