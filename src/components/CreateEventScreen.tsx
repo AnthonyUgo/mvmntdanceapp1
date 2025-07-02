@@ -1,6 +1,7 @@
 // src/screens/CreateEventScreen.tsx
 import 'react-native-get-random-values';
 import React, { useState, useContext } from 'react';
+import { Switch } from 'react-native';
 import {
 View, Text, TextInput, TouchableOpacity, StyleSheet,
 Image, ScrollView, Dimensions, KeyboardAvoidingView,
@@ -9,6 +10,7 @@ Platform, TouchableWithoutFeedback, Keyboard, Alert
 import { TabView, SceneMap, TabBar } from 'react-native-tab-view';
 import { launchImageLibraryAsync, MediaTypeOptions } from 'expo-image-picker';
 import DateTimePicker from '@react-native-community/datetimepicker';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -41,10 +43,12 @@ const [venueName, setVenueName] = useState('');
 const [venueAddress, setVenueAddress] = useState('');
 const [ticketName, setTicketName] = useState('');
 const [ticketType, setTicketType] = useState<'Paid' | 'Free' | 'Donation'>('Paid');
-const [ticketOptions, setTicketOptions] = useState<{ name: string; price?: string; qty: string }[]>([]);
+const [ticketOptions, setTicketOptions] = useState<{ name: string; price?: string; qty: string; timeLimit?: string }[]>([]);
 const [currentTicket, setCurrentTicket] = useState({ name: '', price: '', qty: '' });
 const [ticketPrice, setTicketPrice] = useState('');
 const [ticketQty, setTicketQty] = useState('');
+const [collaboratorInput, setCollaboratorInput] = useState('');
+const [collaborators, setCollaborators] = useState<string[]>([]);
 const [isPrivate, setIsPrivate] = useState(false);
 
 const pickImage = async () => {
@@ -65,8 +69,11 @@ const payload = {
   id: Date.now().toString(),
   title,
   image: imageUri,
-  date: date.toISOString().slice(0, 10),
+  description,
+  startDate: startDate.toISOString().slice(0, 10),
+  endDate: endDate.toISOString().slice(0, 10),
   startTime: startTime.toTimeString().slice(0, 5),
+  endTime: endTime.toTimeString().slice(0, 5),
   venueName,
   venueAddress,
   tickets: ticketOptions.map(t => ({
@@ -74,8 +81,10 @@ const payload = {
   price: ticketType === 'Paid' ? parseFloat(t.price || '0') : 0,
   quantity: parseInt(t.qty, 10),
   type: ticketType,
+  timeLimit: t.timeLimit || ''
 })),
   visibility: isPrivate ? 'private' : 'public',
+  collaborators,
   organizerId,
 };
 
@@ -325,14 +334,52 @@ const TicketStep = () => {
 
 
 const SettingsStep = () => (
-<ScrollView contentContainerStyle={styles.step}>
-<TouchableOpacity onPress={() => setIsPrivate(p => !p)}>
-<Text style={{ color: isPrivate ? '#4285F4' : '#888' }}>
-{isPrivate ? 'Private' : 'Public'}
-</Text>
-</TouchableOpacity>
-</ScrollView>
+
+  <ScrollView contentContainerStyle={styles.step}>
+    <View style={styles.bubbleCard}>
+      <Text style={styles.label}>Event Visibility</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ color: '#333', fontSize: 16 }}>{isPrivate ? 'Private' : 'Public'}</Text>
+        <Switch
+          value={isPrivate}
+          onValueChange={setIsPrivate}
+          trackColor={{ false: '#ccc', true: '#4285F4' }}
+          thumbColor="#fff"
+        />
+      </View>
+    </View>
+
+    <View style={styles.bubbleCard}>
+      <Text style={styles.label}>Add Collaborators</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Type @ + username"
+        placeholderTextColor="#888"
+        value={collaboratorInput}
+        onChangeText={handleCollaboratorChange}
+      />
+      {collaborators.map((u, i) => (
+        <Text key={i} style={{ color: '#555' }}>@{u}</Text>
+      ))}
+    </View>
+  </ScrollView>
 );
+
+const handleCollaboratorChange = async (text: string) => {
+  setCollaboratorInput(text);
+  if (text.startsWith('@') && text.length > 1) {
+    const query = text.slice(1, 2); // first letter after "@"
+    try {
+      const res = await fetch(`https://jomvmnt.documents.azure.com:443/api/users/search?prefix=${query}`);
+      const json = await res.json();
+      if (Array.isArray(json.users)) setCollaborators(json.users);
+    } catch (err) {
+      console.error('Collaborator search failed', err);
+    }
+  } else {
+    setCollaborators([]);
+  }
+};
 
 const renderScene = SceneMap({
 image: ImageStep,
@@ -427,18 +474,32 @@ const styles = StyleSheet.create({
   input: {
     width: '100%',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 18,
+    borderRadius: 20, // more bubble-like
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    marginBottom: 16,
     fontSize: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ccc',
   },
+
+  bubbleCard: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+
   navButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',

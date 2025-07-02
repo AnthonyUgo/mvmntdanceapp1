@@ -48,7 +48,7 @@ router.post(
 // POST /api/events
 router.post('/', async (req, res) => {
   const {
-    id, title, date, startTime, endTime,
+    id, title, collaborators, description, startDate, endDate, startTime, endTime,
     venueName, venueAddress, price, quantity,
     collaborator, image, draft = false,
     tickets = [], visibility, shareCode, organizerId
@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
 
   if (
     !organizerId ||
-    !id || !title || !date || !startTime || !endTime ||
+    !id || !title || !startDate || !startTime || !endTime ||
     !venueName || !venueAddress
   ) {
     return res.status(400).json({ error: 'Missing required event fields.' });
@@ -65,7 +65,9 @@ router.post('/', async (req, res) => {
   const eventData = {
     id,
     title,
-    date,
+    description,
+    startDate,
+    endDate,
     startTime,
     endTime,
     venueName,
@@ -75,6 +77,7 @@ router.post('/', async (req, res) => {
     collaborator,
     image,
     draft,
+    collaborators,
     visibility,   // "public" or "private"
     shareCode,    // null or code
     tickets,

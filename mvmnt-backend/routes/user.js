@@ -121,6 +121,25 @@ router.get('/by-username', async (req, res) => {
   }
 });
 
+// GET /api/users/search?prefix=a
+router.get('/search', async (req, res) => {
+  const { prefix } = req.query;
+  if (!prefix) return res.status(400).json({ error: 'Missing prefix' });
+  try {
+    const query = {
+      query: 'SELECT c.username FROM c WHERE STARTSWITH(c.username, @prefix)',
+      parameters: [{ name: '@prefix', value: prefix }]
+    };
+    const { resources } = await usersContainer.items.query(query).fetchAll();
+    const usernames = resources.map(r => r.username);
+    res.json({ users: usernames });
+  } catch (err) {
+    console.error('❌ Search failed:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 // UPDATE PROFILE IMAGE URL
 router.post('/profile-image', async (req, res) => {
   const { username, imageUri } = req.body;
