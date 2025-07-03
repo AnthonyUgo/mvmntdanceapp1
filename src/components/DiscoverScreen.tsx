@@ -14,6 +14,9 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,7 +41,7 @@ const DiscoverScreen: React.FC = () => {
   const isDark = theme === 'dark';
   const textColor = isDark ? '#fff' : '#000';
   const bgColor = isDark ? '#121212' : '#fff';
-
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [events, setEvents] = useState<EventType[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -149,12 +152,15 @@ const DiscoverScreen: React.FC = () => {
           </Text>
         }
         renderItem={({ item }) => (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: isDark ? '#1e1e1e' : '#fff' },
-            ]}
-          >
+         <TouchableOpacity
+    style={[styles.card, { backgroundColor: isDark ? '#1e1e1e' : '#fff' }]}
+    onPress={() =>
+      navigation.navigate('EventInfo', {
+        eventId: item.id,
+        organizerId: item.organizerId,
+      })
+    }
+  >
             {item.image && (
               <Image source={{ uri: item.image }} style={styles.image} />
             )}
@@ -239,7 +245,7 @@ const DiscoverScreen: React.FC = () => {
                 </Text>
               </TouchableOpacity>
             )}
-          </View>
+          </TouchableOpacity> 
         )}
       />
     </SafeAreaView>

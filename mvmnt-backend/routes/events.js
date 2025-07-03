@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
 
   if (
     !organizerId ||
-    !id || !title || !startDate || !startTime || !endTime ||
+    !id || !title || !startDate || !endDate || !startTime || !endTime ||
     !venueName || !venueAddress
   ) {
     return res.status(400).json({ error: 'Missing required event fields.' });

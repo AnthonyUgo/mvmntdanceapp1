@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
+import 'react-native-reanimated';
 import HomeScreen from './src/components/HomeScreen';
 import AuthScreen from './src/components/AuthScreen';
 import OrganizerLoginScreen from './src/components/OrganizerLoginScreen';
@@ -17,7 +17,7 @@ import MyEventsScreen from './src/components/MyEventScreen';
 import ManageEventScreen from './src/components/ManageEventScreen';
 import FinancialsScreen from './src/components/FinancialsScreen';
 import WebviewScreen from './src/components/WebviewScreen';
-
+import EventInfoScreen from './src/components/EventInfoScreen';
 import { ThemeProvider, ThemeContext } from './src/contexts/ThemedContext';
 
 export type RootStackParamList = {
@@ -28,6 +28,7 @@ export type RootStackParamList = {
   OrganizerAccount: undefined;
   OrganizerDashboard: undefined;
   CreateEvent: undefined;
+  EventInfo: { eventId: string; organizerId: string };
   MyEvents: { initialTab?: 'live' | 'drafts' | 'past' };
   ManageEvent: { eventId: string; isCollaborator?: boolean };
   Profile: undefined;
@@ -63,6 +64,7 @@ export default function App() {
               <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
               <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: 'Create Event' }} />
               <Stack.Screen name="MyEvents" component={MyEventsScreen} options={{ title: 'My Events' }} />
+              <Stack.Screen name="EventInfo" component={EventInfoScreen} />
               <Stack.Screen name="ManageEvent" component={ManageEventScreen} options={{ title: 'Manage Event' }} />
               <Stack.Screen name="Financials" component={FinancialsScreen} options={{ title: 'Manage Ego' }} />
               <Stack.Screen name="WebviewScreen" component={WebviewScreen} options={{ title: 'Map View' }} />
