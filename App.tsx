@@ -8,13 +8,16 @@ import OrganizerLoginScreen from './src/components/OrganizerLoginScreen';
 import OrganizerSignUpScreen from './src/components/OrganizerSignUpScreen';
 import OrganizerAccountScreen from './src/components/OrganizerAccountScreen';
 import OrganizerDashboardScreen from './src/components/OrganizerDashboardScreen';
+import AllEventsScreen from './src/components/AllEventsScreen';
 import UserTabNavigator from './src/components/UserTabNavigator';
 import ForgotPasswordScreen from './src/components/ForgotPasswordScreen';
 import ProfileScreen from './src/components/ProfileScreen';
 import SettingsScreen from './src/components/SettingScreen';
+import OrganizerPublicProfileScreen from './src/components/OrganizerPublicProfileScreen';
 import CreateEventScreen from './src/components/CreateEventScreen';
 import MyEventsScreen from './src/components/MyEventScreen';
 import ManageEventScreen from './src/components/ManageEventScreen';
+import CheckoutScreen from './src/components/CheckoutScreen';
 import FinancialsScreen from './src/components/FinancialsScreen';
 import WebviewScreen from './src/components/WebviewScreen';
 import EventInfoScreen from './src/components/EventInfoScreen';
@@ -27,11 +30,14 @@ export type RootStackParamList = {
   OrganizerSignUp: undefined;
   OrganizerAccount: undefined;
   OrganizerDashboard: undefined;
+  AllEventsScreen: { username: string };
   CreateEvent: undefined;
   EventInfo: { eventId: string; organizerId: string };
   MyEvents: { initialTab?: 'live' | 'drafts' | 'past' };
   ManageEvent: { eventId: string; isCollaborator?: boolean };
   Profile: undefined;
+  OrganizerPublicProfile: { username: string };
+  Checkout: { eventId: string; ticket: any };
   Settings: undefined;
   Financials: undefined;
   ForgotPassword: undefined;
@@ -52,6 +58,8 @@ export default function App() {
               <Stack.Screen name="Auth" component={AuthScreen} options={{ title: 'Sign In' }} />
               <Stack.Screen name="OrganizerLogin" component={OrganizerLoginScreen} options={{ title: 'Login' }} />
               <Stack.Screen name="OrganizerAccount" component={OrganizerAccountScreen} options={{ title: 'Organizer Account' }} />
+              <Stack.Screen name="OrganizerPublicProfile" component={OrganizerPublicProfileScreen} options={{ title: 'Organizer Profile' }} />
+              <Stack.Screen name="AllEventsScreen" component={AllEventsScreen} options={{ title: 'All Events' }} />
               <Stack.Screen name="OrganizerSignUp" component={OrganizerSignUpScreen} options={{ title: 'Sign Up' }} />
               <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} options={{ title: 'Forgot Password' }} />
               <Stack.Screen
@@ -65,6 +73,7 @@ export default function App() {
               <Stack.Screen name="CreateEvent" component={CreateEventScreen} options={{ title: 'Create Event' }} />
               <Stack.Screen name="MyEvents" component={MyEventsScreen} options={{ title: 'My Events' }} />
               <Stack.Screen name="EventInfo" component={EventInfoScreen} />
+              <Stack.Screen name="Checkout" component={CheckoutScreen} options={{ title: 'Checkout' }} />
               <Stack.Screen name="ManageEvent" component={ManageEventScreen} options={{ title: 'Manage Event' }} />
               <Stack.Screen name="Financials" component={FinancialsScreen} options={{ title: 'Manage Ego' }} />
               <Stack.Screen name="WebviewScreen" component={WebviewScreen} options={{ title: 'Map View' }} />

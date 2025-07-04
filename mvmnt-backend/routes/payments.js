@@ -20,7 +20,7 @@ router.post('/create-stripe-account', async (req, res) => {
 
     const user = resources[0];
 
-    console.log('[Stripe] Email (userId):', userId);
+    console.log('[Stripe] Email:', email);
     console.log('[Stripe] ENV Key starts with:', process.env.STRIPE_SECRET_KEY?.slice(0, 10));
 
 

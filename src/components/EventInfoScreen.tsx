@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../contexts/ThemedContext';
+import { Modal, FlatList } from 'react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../App';
 import { API_BASE_URL } from '@env';
@@ -28,6 +29,8 @@ const EventInfoScreen: React.FC = () => {
   
   const route = useRoute();
   const { eventId, organizerId } = route.params as RouteParams;
+  const [ticketModalVisible, setTicketModalVisible] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [event, setEvent] = useState<any>(null);
   const [organizer, setOrganizer] = useState<any>(null);
@@ -67,8 +70,10 @@ const EventInfoScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView style={{ backgroundColor: bgColor }} contentContainerStyle={{ paddingBottom: 80 }}>
+  <>
+    <ScrollView style={{ backgroundColor: bgColor }} contentContainerStyle={{ paddingBottom: 120 }}>
       {event.image && <Image source={{ uri: event.image }} style={styles.image} />}
+
       <View style={{ padding: 16 }}>
         <Text style={[styles.title, { color: textColor }]}>{event.title}</Text>
         <Text style={[styles.subtitle, { color: textColor }]}>
@@ -78,37 +83,96 @@ const EventInfoScreen: React.FC = () => {
           {event.startDate} at {event.startTime}
         </Text>
 
-        <View style={{ marginTop: 16 }}>
+        <View style={{ marginTop: 20 }}>
           <Text style={[styles.sectionHeader, { color: textColor }]}>Overview</Text>
           <Text style={[styles.paragraph, { color: textColor }]}>{event.description}</Text>
         </View>
 
         {organizer && (
-          <View style={{ marginTop: 24 }}>
+          <View style={{ marginTop: 28 }}>
             <Text style={[styles.sectionHeader, { color: textColor }]}>Organized by</Text>
-            <View style={styles.organizerRow}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('OrganizerPublicProfile', { username: organizer.username })}
+              style={styles.organizerRow}
+            >
               <Image source={{ uri: organizer.profileImage }} style={styles.organizerAvatar} />
               <View style={{ marginLeft: 12 }}>
                 <Text style={[styles.organizerName, { color: textColor }]}>{organizer.username}</Text>
                 <Text style={{ color: isDark ? '#ccc' : '#666' }}>
-                  Followers {organizer.followers.length ?? 0}
+                  Followers {organizer.followers?.length ?? 0}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>
-
-      {currentUsername === event.organizerId && (
-        <TouchableOpacity
-          style={styles.manageButton}
-          onPress={() => navigation.navigate('ManageEvent', { eventId })}
-        >
-          <Text style={styles.manageText}>Manage Event</Text>
-        </TouchableOpacity>
-      )}
     </ScrollView>
-  );
+
+    {/* Manage Event Button */}
+    {currentUsername === event.organizerId && (
+      <TouchableOpacity
+        style={styles.manageButton}
+        onPress={() => navigation.navigate('ManageEvent', { eventId })}
+      >
+        <Text style={styles.manageText}>Manage Event</Text>
+      </TouchableOpacity>
+    )}
+
+    {/* Buy Ticket Button */}
+    {event.tickets?.length > 0 && (
+      <TouchableOpacity
+        style={[styles.manageButton, {
+          backgroundColor: '#28a745',
+          bottom: currentUsername === event.organizerId ? 80 : 16
+        }]}
+        onPress={() => setTicketModalVisible(true)}
+      >
+        <Text style={styles.manageText}>Buy Ticket</Text>
+      </TouchableOpacity>
+    )}
+
+    {/* Ticket Modal */}
+    <Modal visible={ticketModalVisible} animationType="slide" transparent={true}>
+      <View style={[styles.modalContainer, { backgroundColor: bgColor }]}>
+        <Text style={[styles.modalTitle, { color: textColor }]}>Select a Ticket</Text>
+        <FlatList
+          data={event.tickets}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.ticketOption}
+              onPress={() => setSelectedTicket(item)}
+            >
+              <Text style={[styles.ticketTitle, { color: textColor }]}>{item.name}</Text>
+              <Text style={{ color: isDark ? '#ccc' : '#666' }}>
+                ${item.price} • Qty: {item.qty}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+        <TouchableOpacity
+          style={styles.purchaseButton}
+          onPress={() => {
+            setTicketModalVisible(false);
+            navigation.navigate('Checkout', {
+              eventId: event.id,
+              ticket: selectedTicket,
+            });
+          }}
+          disabled={!selectedTicket}
+        >
+          <Text style={styles.purchaseButtonText}>
+            {selectedTicket ? `Purchase ${selectedTicket.name}` : 'Select a Ticket'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => setTicketModalVisible(false)} style={styles.closeModalButton}>
+          <Text style={styles.manageText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  </>
+);
 };
 
 const styles = StyleSheet.create({
@@ -131,6 +195,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  modalContainer: {
+  flex: 1,
+  marginTop: '30%',
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+  padding: 16,
+},
+modalTitle: {
+  fontSize: 20,
+  fontWeight: '600',
+  marginBottom: 12,
+},
+ticketOption: {
+  paddingVertical: 12,
+  borderBottomWidth: 1,
+  borderBottomColor: '#ccc',
+},
+ticketTitle: {
+  fontSize: 16,
+  fontWeight: '500',
+},
+purchaseButton: {
+  backgroundColor: '#28a745',
+  padding: 12,
+  borderRadius: 8,
+  marginTop: 16,
+  alignItems: 'center',
+},
+purchaseButtonText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '600',
+},
+closeModalButton: {
+  marginTop: 12,
+  padding: 10,
+  alignItems: 'center'
+},
   manageText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });
 

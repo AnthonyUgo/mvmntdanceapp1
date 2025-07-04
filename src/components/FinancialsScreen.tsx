@@ -28,8 +28,9 @@ const FinancialsScreen = () => {
       }
 
       const response = await axios.post(`${API_BASE_URL}/payments/create-stripe-account`, {
-        userId: storedEmail,
+        email: storedEmail,
       });
+      
 
       if (response.data.alreadyConnected) {
         Linking.openURL(response.data.loginLink);
