@@ -6,6 +6,7 @@ const User = require('../models/User'); // Update with your actual User model
 
 // ========== 1. CREATE OR RETURN STRIPE ACCOUNT ========== //
 router.post('/create-stripe-account', async (req, res) => {
+  console.log('✅ /create-stripe-account route triggered');
   const { email } = req.body;
 
   try {
