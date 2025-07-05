@@ -11,51 +11,94 @@ export interface EventCardProps {
   image?: string;
   price?: string;
   onPress?: () => void;
-  onSaveToggle?: () => Promise<void>;
+  onSaveToggle?: () => void | Promise<void>;
   saved?: boolean;
 }
 
 const EventCard: React.FC<EventCardProps> = ({
-  title, date, startTime, venueName, image, price,
-  onPress, onSaveToggle, saved = false
-}) => (
-  <TouchableOpacity style={styles.card} onPress={onPress}>
-    {image && <Image source={{ uri: image }} style={styles.image} />}
-    <View style={styles.headerRow}>
-      <Text style={styles.title}>{title}</Text>
-      {onSaveToggle && (
-        <Ionicons
-          name={saved ? 'heart' : 'heart-outline'}
-          size={24}
-          color={saved ? '#a259ff' : '#888'}
-          onPress={onSaveToggle}
-        />
+  title,
+  date,
+  startTime,
+  venueName,
+  image,
+  price = 'Free',
+  onPress,
+  onSaveToggle,
+  saved = false,
+}) => {
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+      {image ? (
+        <Image source={{ uri: image }} style={styles.image} />
+      ) : (
+        <View style={[styles.image, styles.placeholder]}>
+          <Ionicons name="image-outline" size={40} color="#aaa" />
+        </View>
       )}
-    </View>
-    <Text style={styles.subtitle}>{date} • {startTime}</Text>
-    <Text style={styles.subtitle}>{venueName}</Text>
-    <Text style={styles.price}>{price ?? 'Free'}</Text>
-  </TouchableOpacity>
-);
+
+      <View style={styles.info}>
+        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        <Text style={styles.meta}>{date} • {startTime}</Text>
+        <Text style={styles.meta}>{venueName}</Text>
+        <View style={styles.footer}>
+          <Text style={styles.price}>{price}</Text>
+          {onSaveToggle && (
+            <TouchableOpacity onPress={onSaveToggle}>
+              <Ionicons
+                name={saved ? 'heart' : 'heart-outline'}
+                size={22}
+                color={saved ? '#e91e63' : '#aaa'}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+   
 
 const styles = StyleSheet.create({
   card: {
-    marginBottom: 16,
-    borderRadius: 12,
-    overflow: 'hidden',
     backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
     elevation: 2,
-    padding: 12,
   },
   image: {
-    width: '100%', height: 180, borderRadius: 8, marginBottom: 8
+    width: '100%',
+    height: 180,
+    backgroundColor: '#f0f0f0',
   },
-  headerRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'
+  placeholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: { fontSize: 18, fontWeight: '600', flex: 1 },
-  subtitle: { fontSize: 14, color: '#666', marginTop: 2 },
-  price: { fontSize: 16, fontWeight: '500', marginTop: 4 },
+  info: {
+    padding: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  meta: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 2,
+  },
+  footer: {
+    marginTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  price: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000',
+  },
 });
 
 export default EventCard;

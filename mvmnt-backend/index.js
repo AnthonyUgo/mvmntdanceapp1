@@ -16,6 +16,9 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/api/users', userRoutes);
+app.use('/api/payments/webhook', require('./routes/payments').rawWebhook); // raw body
+app.use('/api/payments', require('./routes/payments').router); // regular JSON
+
 
 // Log environment variables (useful for debugging)
 console.log(`🔍 COSMOS_DB_URI: ${process.env.COSMOS_DB_URI ? 'Loaded' : 'Not found'}`);

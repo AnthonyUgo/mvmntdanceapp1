@@ -11,10 +11,12 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import axios from 'axios';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../contexts/ThemedContext';
 import { launchImageLibraryAsync, MediaTypeOptions } from 'expo-image-picker';
+import { API_BASE_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type RootStackParamList = {
@@ -36,6 +38,9 @@ const ManageEventScreen: React.FC = () => {
   const [event, setEvent]     = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [image, setImage]     = useState<string|null>(null);
+  const [tickets, setTickets] = useState<any[]>([]);
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public');
+  const [collaborators, setCollaborators] = useState<string[]>([]);
 
   const bg     = theme === 'dark' ? '#121212' : '#fff';
   const txt    = theme === 'dark' ? '#fff'    : '#000';
@@ -49,17 +54,28 @@ const ManageEventScreen: React.FC = () => {
         return setLoading(false);
       }
       try {
-        const res  = await fetch(`${API_URL}/${eventId}?organizerId=${organizerId}`);
-        const data = await res.json();
+        const res  = await axios.get(`${API_URL}/${eventId}?organizerId=${organizerId}`);
+        const data = res.data;
         setEvent({
-          ...data,
-          venue: {
-            name:    data.venueName    || '',
-            address: data.venueAddress || '',
-          },
-          price:    data.price    ?? '',
-          quantity: data.quantity ?? 0,
-        });
+         ...data,
+         title: data.title || '',
+         description: data.description || '',
+         startDate: data.startDate || data.date || '',
+         endDate: data.endDate || '',
+         startTime: data.startTime || '',
+         endTime: data.endTime || '',
+         venue: {
+           name:    data.venueName    || '',
+           address: data.venueAddress || '',
+         },
+         quantity: data.quantity ?? 0,
+         price: data.price ?? '',
+         image: data.image || null,
+         collaborator: data.collaborator || '',
+       });
+        setTickets(Array.isArray(data.tickets) ? data.tickets : []);
+        setVisibility(data.visibility === 'private' ? 'private' : 'public');
+        setCollaborators(Array.isArray(data.collaborators) ? data.collaborators : []);
         setImage(data.image || null);
       } catch {
         Alert.alert('Error', 'Failed to load event');
@@ -83,6 +99,13 @@ const ManageEventScreen: React.FC = () => {
     }
   };
 
+
+  const updateTicket = (index: number, newTicket: any) => {
+   const updated = [...tickets];
+   updated[index] = newTicket;
+   setTickets(updated);
+ };
+
   // update AsyncStorage list
   const updateLocalList = async (updatedEvent: any) => {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -104,23 +127,42 @@ const ManageEventScreen: React.FC = () => {
 
   // save edits
   const handleSave = async () => {
-    try {
-      const organizerId = await AsyncStorage.getItem('organizerUsername');
-      const res = await fetch(
-        `${API_URL}/${eventId}?organizerId=${organizerId}`,
-        {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(event),
-        }
-      );
-      if (!res.ok) throw new Error();
-      await updateLocalList(event);
-      Alert.alert('Saved', 'Event updated successfully');
-    } catch {
-      Alert.alert('Error', 'Failed to save event');
-    }
-  };
+  try {
+    const organizerId = await AsyncStorage.getItem('organizerUsername');
+    if (!organizerId) throw new Error('Organizer ID not found');
+
+    const payload = {
+      id: eventId,
+      organizerId,
+      title: event.title,
+      description: event.description,
+      startDate: event.startDate,
+      endDate: event.endDate,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      venueName: event.venue?.name ?? '',
+      venueAddress: event.venue?.address ?? '',
+      price: parseFloat(event.price) || 0,
+      quantity: parseInt(event.quantity) || 0,
+      collaborator: event.collaborator ?? '',
+      image: image,
+      tickets,
+      visibility,
+      collaborators,
+      draft: false,
+    };
+
+    const res = await axios.post(API_URL, payload);
+    await updateLocalList(res.data.event);
+
+    Alert.alert('Success', 'Event updated successfully.');
+  } catch (err: any) {
+    console.error('❌ Save error:', err?.response?.data || err.message || err);
+    Alert.alert('Error', 'Failed to save event');
+  }
+};
+
+
 
   // delete locally (but keep in DB)
   const handleDelete = async () => {
@@ -191,7 +233,9 @@ const ManageEventScreen: React.FC = () => {
       </TouchableOpacity>
 
       {renderInput('Title',       event.title,     t => setEvent({ ...event, title: t }))}
-      {renderInput('Date',        event.date,      t => setEvent({ ...event, date: t }))}
+      {renderInput('Description', event.description || '', t => setEvent({ ...event, description: t }))}
+      {renderInput('Start Date', event.startDate || '', t => setEvent({ ...event, startDate: t }))}
+      {renderInput('End Date', event.endDate || '', t => setEvent({ ...event, endDate: t }))}
       {renderInput('Start Time',  event.startTime, t => setEvent({ ...event, startTime: t }))}
       {renderInput('End Time',    event.endTime,   t => setEvent({ ...event, endTime: t }))}
       {renderInput(
@@ -221,6 +265,42 @@ const ManageEventScreen: React.FC = () => {
         event.collaborator || '',
         t => setEvent({ ...event, collaborator: t })
       )}
+
+      {renderInput(
+        'Collaborators (comma separated)',
+         collaborators.join(', '),
+         t => setCollaborators(t.split(',').map(s => s.trim()))
+      )}
+
+       {/* Visibility Toggle */}
+     <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
+       <Text style={{ color: txt, fontSize: 16, marginRight: 12 }}>Private Event?</Text>
+        <TouchableOpacity
+         onPress={() => setVisibility(visibility === 'private' ? 'public' : 'private')}
+         style={{
+           backgroundColor: visibility === 'private' ? '#a259ff' : '#ccc',
+           paddingHorizontal: 12,
+           paddingVertical: 6,
+           borderRadius: 20,
+         }}
+         >
+        <Text style={{ color: '#fff' }}>
+      {visibility === 'private' ? 'Private' : 'Public'}
+     </Text>
+   </TouchableOpacity>
+</View>
+
+     {/* Ticket List */}
+<Text style={{ color: txt, fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Tickets</Text>
+{tickets.map((ticket, i) => (
+  <View key={i} style={{ marginBottom: 12 }}>
+    {renderInput('Name', ticket.name, t => updateTicket(i, { ...ticket, name: t }))}
+    {renderInput('Price', String(ticket.price), t => updateTicket(i, { ...ticket, price: parseFloat(t) }), 'decimal-pad')}
+    {renderInput('Quantity', String(ticket.qty), t => updateTicket(i, { ...ticket, qty: parseInt(t) || 0 }), 'number-pad')}
+    {renderInput('Time Limit', ticket.timeLimit || '', t => updateTicket(i, { ...ticket, timeLimit: t }))}
+  </View>
+))}
+
 
       {/* Save + Delete buttons */}
       <View style={styles.buttonRow}>

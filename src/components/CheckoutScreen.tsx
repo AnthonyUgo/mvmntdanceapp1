@@ -6,6 +6,7 @@ import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import type { RootStackParamList } from '../../App';
 import { ThemeContext } from '../contexts/ThemedContext';
 import axios from 'axios';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { API_BASE_URL } from '@env';
 
 type CheckoutScreenRouteProp = RouteProp<RootStackParamList, 'Checkout'>;
@@ -17,7 +18,7 @@ const CheckoutScreen: React.FC = () => {
   const textColor = isDark ? '#fff' : '#000';
 
   const route = useRoute<CheckoutScreenRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { eventId, ticket } = route.params;
 
   const [loading, setLoading] = useState(false);

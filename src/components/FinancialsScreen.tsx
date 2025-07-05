@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  useColorScheme,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -17,6 +18,26 @@ const FinancialsScreen = () => {
   const [selectedFilter, setSelectedFilter] = useState('7d');
   const [totalSales, setTotalSales] = useState(0);
   const [loadingStripe, setLoadingStripe] = useState(false);
+  const scheme = useColorScheme();
+  const isDark = scheme === 'dark';
+
+  // Fetch Stripe earnings
+  useEffect(() => {
+    const fetchEarnings = async () => {
+      const userEmail = await AsyncStorage.getItem('userEmail');
+      if (!userEmail) return;
+
+      try {
+        const res = await axios.get(`${API_BASE_URL}/payments/earnings/${userEmail}`);
+        const available = res.data.balance?.available?.[0]?.amount || 0;
+        setTotalSales(available / 100); // Stripe returns cents
+      } catch (err) {
+        console.error('Earnings fetch error:', err);
+      }
+    };
+
+    fetchEarnings();
+  }, []);
 
   const connectToStripe = async () => {
     try {
@@ -30,14 +51,13 @@ const FinancialsScreen = () => {
       const response = await axios.post(`${API_BASE_URL}/payments/create-stripe-account`, {
         email: storedEmail,
       });
-      
 
-      if (response.data.alreadyConnected) {
-        Linking.openURL(response.data.loginLink);
-      } else {
-        Linking.openURL(response.data.onboardingUrl);
-      }
-    } catch (err: unknown) {
+      const url = response.data.alreadyConnected
+        ? response.data.loginLink
+        : response.data.onboardingUrl;
+
+      Linking.openURL(url);
+    } catch (err) {
       if (axios.isAxiosError(err)) {
         Alert.alert('Stripe Error', err.response?.data?.error || 'Unable to connect to Stripe.');
       } else {
@@ -47,6 +67,69 @@ const FinancialsScreen = () => {
       setLoadingStripe(false);
     }
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      padding: 20,
+      backgroundColor: isDark ? '#121212' : '#fdfdfd',
+      flexGrow: 1,
+    },
+    header: {
+      fontSize: 24,
+      fontWeight: '700',
+      marginBottom: 20,
+      color: isDark ? '#fff' : '#000',
+    },
+    filterRow: {
+      flexDirection: 'row',
+      marginBottom: 20,
+      justifyContent: 'space-around',
+    },
+    filterButton: {
+      padding: 10,
+      backgroundColor: '#eee',
+      borderRadius: 12,
+    },
+    activeFilter: {
+      backgroundColor: '#4285F4',
+    },
+    filterText: {
+      color: isDark ? '#fff' : '#000',
+      fontWeight: '500',
+    },
+    salesLabel: {
+      fontSize: 18,
+      color: isDark ? '#ccc' : '#666',
+    },
+    salesAmount: {
+      fontSize: 32,
+      fontWeight: '800',
+      marginVertical: 10,
+      color: isDark ? '#fff' : '#000',
+    },
+    section: {
+      marginVertical: 20,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      marginBottom: 10,
+      color: isDark ? '#fff' : '#000',
+    },
+    button: {
+      backgroundColor: '#222',
+      padding: 14,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    withdrawButton: {
+      backgroundColor: '#E53935',
+    },
+    buttonText: {
+      color: '#fff',
+      fontWeight: '600',
+    },
+  });
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -102,62 +185,3 @@ const FinancialsScreen = () => {
 };
 
 export default FinancialsScreen;
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 20,
-    backgroundColor: '#fdfdfd',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 20,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    justifyContent: 'space-around',
-  },
-  filterButton: {
-    padding: 10,
-    backgroundColor: '#eee',
-    borderRadius: 12,
-  },
-  activeFilter: {
-    backgroundColor: '#4285F4',
-  },
-  filterText: {
-    color: '#000',
-    fontWeight: '500',
-  },
-  salesLabel: {
-    fontSize: 18,
-    color: '#666',
-  },
-  salesAmount: {
-    fontSize: 32,
-    fontWeight: '800',
-    marginVertical: 10,
-  },
-  section: {
-    marginVertical: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: '#222',
-    padding: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  withdrawButton: {
-    backgroundColor: '#E53935',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-});

@@ -29,13 +29,26 @@ const API_URL =
 type Event = {
   id: string;
   title: string;
-  date: string;
+  date: string; // ← can be used as alias of startDate
+  startDate?: string;
+  endDate?: string;
   startTime: string;
   endTime: string;
   draft: boolean;
   quantity: number;
   tickets?: { purchased: boolean }[];
   venue: { name: string; address: string };
+};
+
+
+
+const getLocalDateTime = (dateStr: string, timeStr: string): number => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const [hour, minute] = timeStr.split(':').map(Number);
+  const d = new Date();
+  d.setFullYear(year, month - 1, day);
+  d.setHours(hour, minute, 0, 0);
+  return d.getTime();
 };
 
 const MyEventsScreen: React.FC = () => {
@@ -91,22 +104,26 @@ const MyEventsScreen: React.FC = () => {
       // Normalize times & structure
       const normalize = (time: string) => {
         if (!time) return '00:00';
-        const t = new Date(`1970-01-01T${time}`);
-        return isNaN(t.getTime())
-          ? '00:00'
-          : t.toISOString().substr(11, 5);
+        const [h, m] = time.split(':');
+        const hh = h.padStart(2, '0');
+        const mm = m?.padStart(2, '0') ?? '00';
+        return `${hh}:${mm}`;
       };
+
 
       const normalized: Event[] = raw.map((e: any) => ({
         id:          e.id,
         title:       e.title,
-        date:        e.date || '1970-01-01',
+        date: e.startDate || '1970-01-01',
         startTime:   normalize(e.startTime),
         endTime:     normalize(e.endTime),
         draft:       e.draft ?? false,
         quantity:    e.quantity ?? 0,
         tickets:     Array.isArray(e.tickets) ? e.tickets : [],
-        venue:       e.venue || { name: e.venueName || '', address: e.venueAddress || '' },
+        venue: {
+          name: e.venue?.name ?? e.venueName ?? '',
+          address: e.venue?.address ?? e.venueAddress ?? '',
+        },
       }));
 
       // Sort chronologically
@@ -146,8 +163,8 @@ const MyEventsScreen: React.FC = () => {
   // Filter & search
   const filtered = events
     .filter(e => {
-      const start = new Date(`${e.date}T${e.startTime}`).getTime();
-      const end   = new Date(`${e.date}T${e.endTime}`).getTime();
+      const start = getLocalDateTime(e.date, e.startTime);
+      const end   = getLocalDateTime(e.date, e.endTime);
       if (activeTab === 'live')   return !e.draft && end >= now;
       if (activeTab === 'past')   return !e.draft && end < now;
       if (activeTab === 'drafts') return e.draft;
@@ -156,11 +173,12 @@ const MyEventsScreen: React.FC = () => {
     .filter(e => e.title.toLowerCase().includes(search.toLowerCase()));
 
   const getCountdown = (e: Event) => {
-    const start = new Date(`${e.date}T${e.startTime}`).getTime();
+    const start = getLocalDateTime(e.date, e.startTime);
+    const end   = getLocalDateTime(e.date, e.endTime);
     const nowMs = Date.now();
-    if (nowMs >= start && nowMs <= new Date(`${e.date}T${e.endTime}`).getTime()) {
-      return <Text style={styles.liveLabel}>NOW</Text>;
-    }
+    if (nowMs >= start && nowMs <= end) {
+    return <Text style={styles.liveLabel}>NOW</Text>;
+  }
     const diff = start - nowMs;
     if (diff <= 0) return null;
     const days = Math.floor(diff / 86400000);
@@ -237,12 +255,12 @@ const MyEventsScreen: React.FC = () => {
                   <Text style={{ color: accentColor, fontSize: 12, marginVertical: 4 }}>
                     {sold}/{item.quantity} tickets sold
                   </Text>
-                  {item.venue.name && (
+                  {item?.venue?.name ? (
                     <View style={styles.venueChip}>
                       <Ionicons name="location-outline" size={14} color="#fff" />
                       <Text style={styles.venueText}>{item.venue.name}</Text>
-                    </View>
-                  )}
+                   </View>
+                 ) : null}
                 </View>
               </TouchableOpacity>
             );

@@ -47,6 +47,8 @@ const EventInfoScreen: React.FC = () => {
 
         const eventRes = await axios.get(`${API_BASE_URL}/api/events/${eventId}?organizerId=${organizerId}`);
         setEvent(eventRes.data);
+        console.log('🧾 Tickets:', eventRes.data.tickets);
+
 
         const organizerRes = await axios.get(`${API_BASE_URL}/api/users/by-username?username=${eventRes.data.organizerId}`);
         setOrganizer(organizerRes.data.user);
@@ -60,6 +62,7 @@ const EventInfoScreen: React.FC = () => {
 
     loadEvent();
   }, []);
+  
 
   if (loading || !event) {
     return (
@@ -137,7 +140,7 @@ const EventInfoScreen: React.FC = () => {
         <Text style={[styles.modalTitle, { color: textColor }]}>Select a Ticket</Text>
         <FlatList
           data={event.tickets}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.name}-${index}`}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.ticketOption}

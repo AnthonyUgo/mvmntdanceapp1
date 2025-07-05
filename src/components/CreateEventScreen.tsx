@@ -86,8 +86,12 @@ if (!res.canceled && res.assets.length) setImageUri(res.assets[0].uri);
 
 const handlePublish = async () => {
 const organizerId = await AsyncStorage.getItem('organizerUsername');
-if (!title || !venueName || !ticketName || !ticketQty) {
-return Alert.alert('Missing required fields');
+if (!title || !venueName || !ticketOptions.length) {
+  return Alert.alert('Missing required fields');
+}
+const hasValidTickets = ticketOptions.every(t => t.name && t.qty && (ticketType !== 'Paid' || t.price));
+if (!hasValidTickets) {
+  return Alert.alert('Each ticket must have name, qty, and price if paid');
 }
 const payload = {
   id: Date.now().toString(),
@@ -96,8 +100,8 @@ const payload = {
   description,
   startDate: startDate.toISOString().slice(0, 10),
   endDate: endDate.toISOString().slice(0, 10),
-  startTime: startTime.toTimeString().slice(0, 5),
-  endTime: endTime.toTimeString().slice(0, 5),
+  startTime: startTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
+  endTime: endTime.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }),
   venueName,
   venueAddress,
   tickets: ticketOptions.map(t => ({
