@@ -1,7 +1,7 @@
 const express = require('express');
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const router = express.Router();
-const { usersContainer } = require('../index'); // Add this if not already
+const { usersContainer } = require('../db'); 
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
 // ========== 1. CREATE OR RETURN STRIPE ACCOUNT ========== //
