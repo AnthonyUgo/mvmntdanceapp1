@@ -31,6 +31,7 @@ const EventInfoScreen: React.FC = () => {
   const { eventId, organizerId } = route.params as RouteParams;
   const [ticketModalVisible, setTicketModalVisible] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [ticketQuantity, setTicketQuantity] = useState(1);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [event, setEvent] = useState<any>(null);
   const [organizer, setOrganizer] = useState<any>(null);
@@ -148,11 +149,27 @@ const EventInfoScreen: React.FC = () => {
             >
               <Text style={[styles.ticketTitle, { color: textColor }]}>{item.name}</Text>
               <Text style={{ color: isDark ? '#ccc' : '#666' }}>
-                ${item.price} • Qty: {item.qty}
+                 ${parseFloat(item.price || 0).toFixed(2)} • Qty: {item.qty}
               </Text>
             </TouchableOpacity>
           )}
         />
+
+        {selectedTicket && (
+       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+         <Text style={{ color: textColor }}>Quantity:</Text>
+         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => setTicketQuantity(Math.max(1, ticketQuantity - 1))} style={styles.qtyButton}>
+        <Text style={styles.qtyButtonText}>-</Text>
+         </TouchableOpacity>
+          <Text style={{ marginHorizontal: 12, color: textColor }}>{ticketQuantity}</Text>
+        <TouchableOpacity onPress={() => setTicketQuantity(ticketQuantity + 1)} style={styles.qtyButton}>
+          <Text style={styles.qtyButtonText}>+</Text>
+      </TouchableOpacity>
+    </View>
+    </View>
+  )}
+
         <TouchableOpacity
           style={styles.purchaseButton}
           onPress={() => {
@@ -160,6 +177,7 @@ const EventInfoScreen: React.FC = () => {
             navigation.navigate('Checkout', {
               eventId: event.id,
               ticket: selectedTicket,
+              quantity: ticketQuantity,
             });
           }}
           disabled={!selectedTicket}
@@ -214,6 +232,16 @@ ticketOption: {
   paddingVertical: 12,
   borderBottomWidth: 1,
   borderBottomColor: '#ccc',
+},
+qtyButton: {
+  backgroundColor: '#ccc',
+  paddingHorizontal: 10,
+  paddingVertical: 5,
+  borderRadius: 6,
+},
+qtyButtonText: {
+  fontSize: 18,
+  fontWeight: 'bold',
 },
 ticketTitle: {
   fontSize: 16,

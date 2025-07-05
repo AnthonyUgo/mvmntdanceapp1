@@ -37,7 +37,7 @@ export type RootStackParamList = {
   ManageEvent: { eventId: string; isCollaborator?: boolean };
   Profile: undefined;
   OrganizerPublicProfile: { username: string };
-  Checkout: { eventId: string; ticket: any };
+  Checkout: { eventId: string; ticket: any; quantity: number };
   Settings: undefined;
   Financials: undefined;
   ForgotPassword: undefined;
